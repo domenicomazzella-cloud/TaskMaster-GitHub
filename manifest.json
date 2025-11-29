@@ -1,0 +1,20 @@
+{
+  "name": "TaskMaster AI",
+  "short_name": "TaskMaster",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "https://unpkg.com/lucide-static@latest/icons/layout.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "https://unpkg.com/lucide-static@latest/icons/layout.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "TaskMaster AI",
+  "description": "Un'applicazione intelligente per la gestione dei task con suggerimenti di tag basati su AI, funzionalità di ricerca avanzata e tracciamento dello stato.",
+  "requestFramePermissions": []
+}
