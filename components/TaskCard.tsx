@@ -7,7 +7,7 @@ import { CheckCircle2, Circle, ArrowRightCircle, Trash2, Edit, Users, Paperclip,
 interface TaskCardProps {
   task: Task;
   currentUserId: string;
-  currentUserRole?: UserRole; // Added role prop
+  currentUserRole?: UserRole;
   projectNames?: string[]; 
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
@@ -18,7 +18,6 @@ interface TaskCardProps {
 
 export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, currentUserRole, projectNames = [], onEdit, onDelete, onTagClick, handleStatusChange, onClick }) => {
   const isOwner = task.ownerId === currentUserId;
-  // Admin can delete ANY task. Owner can delete their own.
   const canDelete = isOwner || currentUserRole === UserRole.ADMIN;
   
   const attachments = task.attachments || [];
@@ -258,8 +257,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, current
           </div>
         )}
         
-        {/* Info Grid (Dates & People) */}
-        <div className="flex items-end justify-between pt-3 border-t border-slate-200/50">
+        {/* Info Grid (Dates & People) - Flex Wrap for Mobile */}
+        <div className="flex flex-wrap items-end justify-between pt-3 border-t border-slate-200/50 gap-2">
           
           {/* Left: Dates */}
           <div className="flex flex-col gap-1.5">
@@ -277,7 +276,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, current
           </div>
 
           {/* Right: People (Owner & Shared) */}
-          <div className="flex flex-col items-end gap-1.5">
+          <div className="flex flex-col items-end gap-1.5 ml-auto">
              {!isOwner && (
                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-900 border-amber-200 shadow-sm ring-1 ring-amber-200/50" title="Proprietario del task">
                   <Crown className="w-3.5 h-3.5 text-amber-600 fill-amber-400" />

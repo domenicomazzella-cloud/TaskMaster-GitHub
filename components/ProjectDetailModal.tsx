@@ -1,21 +1,21 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Project, Task, TaskStatus } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Project, Task, TaskStatus, TaskPriority } from '../types';
 import { Button, Input, Textarea, Badge } from './UI';
-import { X, CheckCircle2, Circle, ArrowRightCircle, Plus, Trash2, Save, LayoutGrid, Unlink, Edit, FolderPlus, Folder, Link as LinkIcon, Search } from 'lucide-react';
+import { X, CheckCircle2, Circle, ArrowRightCircle, Plus, Save, LayoutGrid, Unlink, Edit, FolderPlus, Folder, Link as LinkIcon, Search, Calendar, Flag, User, Clock } from 'lucide-react';
 import { dataService } from '../services/dataService';
 
 interface ProjectDetailModalProps {
   project: Project;
-  allProjects: Project[]; // Passiamo tutti i progetti per cercare i sotto-progetti
-  tasks: Task[]; // All tasks in the system (for linking)
+  allProjects: Project[];
+  tasks: Task[];
   currentUser: any;
   onClose: () => void;
   onUpdateProject: (id: string, data: Partial<Project>) => void;
   onCreateTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
   onEditTask: (task: Task) => void;
-  onOpenCreateTask: (projectId?: string) => void; // Trigger for main Task Modal
-  onOpenSubProject: (project: Project) => void; // Per navigare
+  onOpenCreateTask: (projectId?: string) => void;
+  onOpenSubProject: (project: Project) => void;
 }
 
 export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({ 
@@ -25,51 +25,43 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   currentUser,
   onClose, 
   onUpdateProject, 
-  onCreateTask,
   onEditTask,
   onOpenCreateTask,
   onOpenSubProject
 }) => {
-  // Stati per la modifica anagrafica
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(project.title);
   const [editDesc, setEditDesc] = useState(project.description || '');
 
-  // Stato per collegare task esistente (Link Existing)
   const [isLinkingTask, setIsLinkingTask] = useState(false);
   const [linkSearch, setLinkSearch] = useState('');
   const [linkSuggestions, setLinkSuggestions] = useState<Task[]>([]);
 
-  // Stato per nuovo sotto-progetto
   const [isAddingSubProject, setIsAddingSubProject] = useState(false);
   const [newSubProjectTitle, setNewSubProjectTitle] = useState('');
 
-  // Filtra i task di questo progetto (supporto multi-project array)
   const projectTasks = tasks.filter(t => 
     (t.projectIds && t.projectIds.includes(project.id)) || 
-    t.projectId === project.id // fallback legacy
+    t.projectId === project.id
   );
 
-  // Filtra i task DISPONIBILI per il collegamento (quelli non ancora in questo progetto)
   const availableTasks = tasks.filter(t => 
     !projectTasks.some(pt => pt.id === t.id)
   );
 
-  // Gestione ricerca task esistenti
   useEffect(() => {
     if (isLinkingTask && linkSearch.trim()) {
         const lowerSearch = linkSearch.toLowerCase();
         const results = availableTasks.filter(t => 
             t.title.toLowerCase().includes(lowerSearch) || 
             (t.tags && t.tags.some(tag => tag.toLowerCase().includes(lowerSearch)))
-        ).slice(0, 10); // Limit results
+        ).slice(0, 10);
         setLinkSuggestions(results);
     } else {
         setLinkSuggestions([]);
     }
   }, [linkSearch, isLinkingTask, tasks]);
 
-  // Filtra i sotto-progetti
   const subProjects = allProjects.filter(p => p.parentProjectId === project.id);
   
   const total = projectTasks.length;
@@ -102,7 +94,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
     try {
         await dataService.createProject({
             title: newSubProjectTitle,
-            parentProjectId: project.id // Gerarchia
+            parentProjectId: project.id
         }, currentUser);
         setNewSubProjectTitle('');
         setIsAddingSubProject(false);
@@ -126,20 +118,23 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   const statusIcon = {
     [TaskStatus.TODO]: <Circle className="w-4 h-4 text-slate-400" />,
     [TaskStatus.IN_PROGRESS]: <ArrowRightCircle className="w-4 h-4 text-amber-600" />,
-    [TaskStatus.IN_WAITING]: <ArrowRightCircle className="w-4 h-4 text-orange-500" />,
+    [TaskStatus.IN_WAITING]: <Clock className="w-4 h-4 text-orange-500" />,
     [TaskStatus.DONE]: <CheckCircle2 className="w-4 h-4 text-green-600" />,
+  };
+
+  const priorityColors = {
+    [TaskPriority.HIGH]: 'bg-red-100 text-red-700 border-red-200',
+    [TaskPriority.MEDIUM]: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    [TaskPriority.LOW]: 'bg-blue-50 text-blue-700 border-blue-200',
   };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        
-        {/* Backdrop */}
         <div className="fixed inset-0 bg-slate-900 bg-opacity-75 transition-opacity backdrop-blur-sm" onClick={onClose}></div>
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
-        {/* Modal Panel - REMOVED overflow-hidden from here to allow dropdowns */}
-        <div className="inline-block align-bottom bg-white rounded-2xl text-left shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-5xl w-full flex flex-col max-h-[90vh]">
+        <div className="inline-block align-bottom bg-white rounded-2xl text-left shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl w-full flex flex-col max-h-[90vh]">
           
           {/* Header */}
           <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-start rounded-t-2xl shrink-0">
@@ -148,7 +143,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                    <LayoutGrid className="w-6 h-6 text-indigo-600" />
                 </div>
                 <div className="w-full">
-                   <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                   <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                        Dashboard Progetto {project.parentProjectId && <span className="text-indigo-400">(Sotto-progetto)</span>}
                    </h2>
                    {!isEditing ? (
@@ -180,14 +175,14 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
              </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 flex-1 overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-4 flex-1 overflow-hidden">
              
              {/* Left: Info & Stats & Subprojects */}
-             <div className="p-6 bg-slate-50/50 border-r border-slate-100 md:col-span-1 space-y-6 overflow-y-auto">
+             <div className="p-6 bg-slate-50/50 border-r border-slate-100 lg:col-span-1 space-y-6 overflow-y-auto">
                 <div>
                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Descrizione</label>
                    {!isEditing ? (
-                      <p className="text-slate-600 text-sm whitespace-pre-wrap cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => setIsEditing(true)}>
+                      <p className="text-slate-600 text-sm whitespace-pre-wrap leading-relaxed cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => setIsEditing(true)}>
                          {project.description || <span className="italic text-slate-400">Nessuna descrizione. Clicca per aggiungere.</span>}
                       </p>
                    ) : (
@@ -196,7 +191,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                 </div>
 
                 <div>
-                   <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Avanzamento Task</label>
+                   <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Avanzamento</label>
                    <div className="flex items-end gap-2 mb-2">
                       <span className="text-3xl font-bold text-indigo-600">{progress}%</span>
                       <span className="text-sm text-slate-500 mb-1">completato</span>
@@ -249,12 +244,15 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                 </div>
              </div>
 
-             {/* Right: Task List */}
-             <div className="p-6 md:col-span-2 flex flex-col h-full overflow-hidden">
+             {/* Right: Task Table */}
+             <div className="p-6 lg:col-span-3 flex flex-col h-full overflow-hidden bg-white">
                 <div className="flex justify-between items-center mb-4 shrink-0 flex-wrap gap-2">
-                   <h3 className="font-bold text-slate-800">Task del Progetto</h3>
+                   <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                     <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-full">{projectTasks.length}</span>
+                     Task del Progetto
+                   </h3>
                    <div className="flex gap-2 relative">
-                       {/* Button: Link Existing Task */}
+                       {/* Link Existing */}
                        {!isLinkingTask ? (
                            <Button variant="secondary" size="sm" icon={LinkIcon} onClick={() => setIsLinkingTask(true)}>
                                Collega Esistente
@@ -264,14 +262,14 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                                <Search className="w-4 h-4 text-indigo-500 ml-2" />
                                <input 
                                    className="text-sm outline-none px-2 py-1 w-48"
-                                   placeholder="Cerca task da collegare..."
+                                   placeholder="Cerca task..."
                                    value={linkSearch}
                                    onChange={(e) => setLinkSearch(e.target.value)}
                                    autoFocus
                                />
                                <button onClick={() => { setIsLinkingTask(false); setLinkSearch(''); }} className="p-1 hover:bg-slate-100 rounded-full"><X className="w-3 h-3 text-slate-400"/></button>
                                
-                               {/* Dropdown Suggestions */}
+                               {/* Suggestions */}
                                {linkSuggestions.length > 0 && (
                                    <div className="absolute top-full left-0 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 z-[70] max-h-48 overflow-y-auto">
                                        {linkSuggestions.map(t => (
@@ -289,15 +287,9 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                                        ))}
                                    </div>
                                )}
-                               {linkSearch && linkSuggestions.length === 0 && (
-                                   <div className="absolute top-full left-0 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 z-[70] p-3 text-xs text-slate-400 text-center">
-                                       Nessun task trovato
-                                   </div>
-                               )}
                            </div>
                        )}
 
-                       {/* Button: Create New Task - Opens MAIN Modal */}
                        <Button 
                          variant="primary" 
                          size="sm" 
@@ -309,48 +301,84 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                    </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                {/* Professional Table Layout */}
+                <div className="flex-1 overflow-y-auto border border-slate-200 rounded-lg">
                    {projectTasks.length === 0 ? (
-                      <div className="text-center py-10 text-slate-400 border-2 border-dashed border-slate-100 rounded-xl">
-                         <LayoutGrid className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                         <p>Nessun task collegato.</p>
+                      <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-slate-50">
+                         <LayoutGrid className="w-12 h-12 mb-2 opacity-10" />
+                         <p className="text-sm">Nessun task collegato a questo progetto.</p>
                       </div>
                    ) : (
-                      projectTasks.map(task => (
-                         <div 
-                           key={task.id} 
-                           onClick={() => onEditTask(task)} // Make clickable to edit
-                           className="group flex items-center justify-between p-3 bg-white border border-slate-100 rounded-lg hover:border-indigo-200 hover:shadow-sm transition-all cursor-pointer"
-                         >
-                            <div className="flex items-center gap-3">
-                               <div>{statusIcon[task.status]}</div>
-                               <div>
-                                  <div className={`text-sm font-medium ${task.status === TaskStatus.DONE ? 'line-through text-slate-400' : 'text-slate-700'}`}>
-                                     {task.title}
-                                  </div>
-                                  <div className="flex gap-2 text-[10px] text-slate-400">
-                                     <span>{task.ownerUsername}</span>
-                                     {task.dueDate && <span>• Scade: {new Date(task.dueDate).toLocaleDateString()}</span>}
-                                     {/* Show other projects if multiple */}
-                                     {task.projectIds && task.projectIds.length > 1 && (
-                                         <span className="text-indigo-400">• +{task.projectIds.length - 1} altri progetti</span>
-                                     )}
-                                  </div>
-                               </div>
-                            </div>
-                            <Button 
-                               variant="ghost" 
-                               className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                               title="Scollega dal progetto"
-                               onClick={(e) => {
-                                 e.stopPropagation(); // Stop propagation to prevent opening edit modal
-                                 handleUnlinkTask(task.id, task.title, task.projectIds);
-                               }}
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-50 text-slate-500 font-semibold text-xs uppercase sticky top-0 z-10">
+                          <tr>
+                            <th className="px-4 py-3 w-10"></th>
+                            <th className="px-4 py-3">Task</th>
+                            <th className="px-4 py-3 w-32 hidden sm:table-cell">Assegnato a</th>
+                            <th className="px-4 py-3 w-32 hidden md:table-cell">Scadenza</th>
+                            <th className="px-4 py-3 w-28 hidden sm:table-cell">Priorità</th>
+                            <th className="px-4 py-3 w-10"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {projectTasks.map(task => (
+                            <tr 
+                              key={task.id} 
+                              className="group hover:bg-slate-50 transition-colors cursor-pointer"
+                              onClick={() => onEditTask(task)}
                             >
-                               <Unlink className="w-4 h-4" />
-                            </Button>
-                         </div>
-                      ))
+                              <td className="px-4 py-3">
+                                {statusIcon[task.status]}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className={`font-medium ${task.status === TaskStatus.DONE ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                                  {task.title}
+                                </div>
+                                <div className="text-xs text-slate-400 sm:hidden">
+                                  {task.ownerUsername}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 hidden sm:table-cell">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
+                                    {task.ownerUsername?.charAt(0) || 'U'}
+                                  </div>
+                                  <span className="text-xs text-slate-600 truncate max-w-[80px]">{task.ownerUsername}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 hidden md:table-cell">
+                                {task.dueDate ? (
+                                  <span className={`text-xs flex items-center gap-1 ${new Date(task.dueDate) < new Date() ? 'text-red-600 font-bold' : 'text-slate-500'}`}>
+                                    <Calendar className="w-3 h-3" />
+                                    {new Date(task.dueDate).toLocaleDateString()}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300">-</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 hidden sm:table-cell">
+                                {task.priority && (
+                                  <Badge color="slate" className={`${priorityColors[task.priority]} border`}>
+                                    {task.priority}
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnlinkTask(task.id, task.title, task.projectIds);
+                                  }}
+                                  className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                  title="Scollega"
+                                >
+                                  <Unlink className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                    )}
                 </div>
              </div>

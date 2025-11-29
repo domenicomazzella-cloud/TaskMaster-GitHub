@@ -4,14 +4,14 @@ import { Task, TaskStatus, TaskPriority, User, Attachment, Project } from '../ty
 import { suggestTagsWithGemini } from '../services/geminiService';
 import { authService } from '../services/authService';
 import { Button, Input, Textarea, Badge, Autocomplete } from './UI';
-import { Sparkles, Plus, Users, Paperclip, Film, FileText, X, Calendar as CalendarIcon, Hash, Briefcase } from 'lucide-react';
+import { Sparkles, Plus, Users, Paperclip, Film, FileText, X, Calendar as CalendarIcon, Hash, Briefcase, Loader2 } from 'lucide-react';
 
 interface TaskFormProps {
   initialTask?: Task | null;
   currentUser: User;
   existingTags?: string[];
   projects?: Project[];
-  initialProjectIds?: string[]; // New prop for pre-selection
+  initialProjectIds?: string[];
   onSubmit: (task: Omit<Task, 'id' | 'createdAt'> | Task) => void;
   onCancel: () => void;
 }
@@ -32,8 +32,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
   const [priority, setPriority] = useState<TaskPriority>(initialTask?.priority || TaskPriority.MEDIUM);
   const [dueDate, setDueDate] = useState(initialTask?.dueDate || '');
   const [attachments, setAttachments] = useState<Attachment[]>(initialTask?.attachments || []);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Multi-Project State - Initialize with prop if available
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(
     initialTask?.projectIds || 
     (initialTask?.projectId ? [initialTask.projectId] : []) || 
@@ -43,24 +43,19 @@ export const TaskForm: React.FC<TaskFormProps> = ({
   const [isGeneratingTags, setIsGeneratingTags] = useState(false);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   
-  // Sharing state
   const [sharedWithIds, setSharedWithIds] = useState<string[]>(initialTask?.sharedWith || []);
   const [sharedUsernames, setSharedUsernames] = useState<Record<string, string>>({}); 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isEdit = !!initialTask;
-  // Owner OR Admin can share
   const canShare = !initialTask || initialTask.ownerId === currentUser.id || currentUser.role === 'ADMIN';
 
-  // Load Users for Sharing Autocomplete
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         const users = await authService.getAllUsers();
         setAllUsers(users);
-        
-        // Populate username cache for badges
         const mapping: Record<string, string> = {};
         users.forEach(u => {
             mapping[u.id] = u.username;
@@ -157,12 +152,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || isSubmitting) return;
 
-    const submitBtn = e.currentTarget.querySelector('button[type="submit"]') as HTMLButtonElement;
-    if(submitBtn) submitBtn.disabled = true;
+    setIsSubmitting(true);
 
     const taskData = {
       title,
@@ -178,13 +172,18 @@ export const TaskForm: React.FC<TaskFormProps> = ({
       projectId: undefined
     };
 
-    if (isEdit && initialTask) {
-      onSubmit({
-        ...initialTask,
-        ...taskData
-      });
-    } else {
-      onSubmit(taskData);
+    try {
+      if (isEdit && initialTask) {
+        await onSubmit({
+          ...initialTask,
+          ...taskData
+        });
+      } else {
+        await onSubmit(taskData);
+      }
+    } catch (e) {
+      console.error(e);
+      setIsSubmitting(false); // Re-enable if error
     }
   };
 
@@ -332,13 +331,13 @@ export const TaskForm: React.FC<TaskFormProps> = ({
               variant="secondary" 
               onClick={() => fileInputRef.current?.click()}
               icon={Paperclip}
-              className="h-24 w-24 flex flex-col items-center justify-center gap-2 border-dashed border-2 text-xs"
+              className="h-24 w-24 flex flex-col items-center justify-center gap-2 border-dashed border-2 text-xs hover:border-indigo-400 hover:text-indigo-600 transition-colors"
             >
               Carica
             </Button>
 
             {attachments.map(att => (
-              <div key={att.id} className="relative group w-24 h-24 rounded-lg border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
+              <div key={att.id} className="relative group w-24 h-24 rounded-lg border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center animate-in zoom-in duration-200">
                 {att.type === 'IMAGE' ? (
                   <img src={att.data} alt={att.name} className="w-full h-full object-cover" />
                 ) : att.type === 'VIDEO' ? (
@@ -359,7 +358,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           </div>
         </div>
 
-        {/* Tags Section with Autocomplete */}
+        {/* Tags Section */}
         <div className="relative">
           <label className="block text-sm font-medium text-slate-700 mb-1">Tag</label>
           <div className="flex gap-2 mb-2">
@@ -394,7 +393,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           </div>
         </div>
 
-        {/* Share Section - With Autocomplete */}
+        {/* Share Section */}
         {canShare && (
           <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
             <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
@@ -424,8 +423,15 @@ export const TaskForm: React.FC<TaskFormProps> = ({
       </div>
 
       <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-        <Button type="button" variant="ghost" onClick={onCancel}>Annulla</Button>
-        <Button type="submit" variant="primary">{isEdit ? 'Salva Modifiche' : 'Crea Task'}</Button>
+        <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>Annulla</Button>
+        <Button 
+          type="submit" 
+          variant="primary" 
+          disabled={isSubmitting || !title.trim()}
+          isLoading={isSubmitting}
+        >
+          {isEdit ? 'Salva Modifiche' : 'Crea Task'}
+        </Button>
       </div>
     </form>
   );
