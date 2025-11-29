@@ -2,11 +2,12 @@
 import React from 'react';
 import { Task, TaskStatus, TaskPriority } from '../types';
 import { Badge } from './UI';
-import { CheckCircle2, Circle, ArrowRightCircle, Trash2, Edit, Users, Paperclip, Film, FileText, Calendar, AlertCircle, Flag, Crown, Tag } from 'lucide-react';
+import { CheckCircle2, Circle, ArrowRightCircle, Trash2, Edit, Users, Paperclip, Film, FileText, Calendar, AlertCircle, Flag, Crown, Tag, LayoutGrid } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
   currentUserId: string;
+  projectName?: string; // Nuova prop per il nome del progetto
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
   onTagClick: (tag: string) => void;
@@ -14,7 +15,7 @@ interface TaskCardProps {
   onClick?: (task: Task) => void;
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, onEdit, onDelete, onTagClick, handleStatusChange, onClick }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, projectName, onEdit, onDelete, onTagClick, handleStatusChange, onClick }) => {
   const isOwner = task.ownerId === currentUserId;
   const attachments = task.attachments || [];
   const [isAnimating, setIsAnimating] = React.useState(false);
@@ -148,7 +149,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, onEdit,
       </div>
 
       {/* Header Row: Status, Priority & Actions */}
-      <div className="flex justify-between items-start mb-3 mt-1 relative z-10">
+      <div className="flex justify-between items-start mb-2 mt-1 relative z-10">
         <div className="flex items-center gap-2">
           <button 
             onClick={handleQuickStatus}
@@ -198,6 +199,16 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, onEdit,
           )}
         </div>
       </div>
+
+      {/* Project Badge */}
+      {projectName && (
+        <div className="mb-2">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100/50">
+            <LayoutGrid className="w-3 h-3" />
+            {projectName}
+          </span>
+        </div>
+      )}
 
       {/* Title & Description */}
       <h3 className={`text-lg font-bold text-slate-800 mb-2 transition-colors group-hover:text-indigo-800 leading-tight ${isDone ? 'line-through text-slate-500' : ''}`}>

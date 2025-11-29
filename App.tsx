@@ -643,18 +643,23 @@ const App: React.FC = () => {
             {viewMode === 'LIST' ? (
               filteredTasks.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredTasks.map(task => (
-                    <TaskCard 
-                      key={task.id} 
-                      task={task} 
-                      currentUserId={user.id}
-                      onEdit={handleEditClick}
-                      onDelete={handleDeleteTask}
-                      onTagClick={addTagFilter}
-                      handleStatusChange={handleStatusChange}
-                      onClick={handleTaskClick}
-                    />
-                  ))}
+                  {filteredTasks.map(task => {
+                    // Trova il progetto associato
+                    const project = projects.find(p => p.id === task.projectId);
+                    return (
+                      <TaskCard 
+                        key={task.id} 
+                        task={task} 
+                        currentUserId={user.id}
+                        projectName={project?.title} // Passa il nome del progetto
+                        onEdit={handleEditClick}
+                        onDelete={handleDeleteTask}
+                        onTagClick={addTagFilter}
+                        handleStatusChange={handleStatusChange}
+                        onClick={handleTaskClick}
+                      />
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
