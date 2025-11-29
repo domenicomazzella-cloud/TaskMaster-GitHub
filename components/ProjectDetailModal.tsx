@@ -14,6 +14,7 @@ interface ProjectDetailModalProps {
   onUpdateProject: (id: string, data: Partial<Project>) => void;
   onCreateTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
   onEditTask: (task: Task) => void;
+  onOpenCreateTask: (projectId?: string) => void; // Trigger for main Task Modal
   onOpenSubProject: (project: Project) => void; // Per navigare
 }
 
@@ -26,6 +27,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   onUpdateProject, 
   onCreateTask,
   onEditTask,
+  onOpenCreateTask,
   onOpenSubProject
 }) => {
   // Stati per la modifica anagrafica
@@ -33,15 +35,10 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   const [editTitle, setEditTitle] = useState(project.title);
   const [editDesc, setEditDesc] = useState(project.description || '');
 
-  // Stato per nuovo task rapido (Create New)
-  const [isAddingTask, setIsAddingTask] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-
   // Stato per collegare task esistente (Link Existing)
   const [isLinkingTask, setIsLinkingTask] = useState(false);
   const [linkSearch, setLinkSearch] = useState('');
   const [linkSuggestions, setLinkSuggestions] = useState<Task[]>([]);
-  const searchTimeoutRef = useRef<any>(null);
 
   // Stato per nuovo sotto-progetto
   const [isAddingSubProject, setIsAddingSubProject] = useState(false);
@@ -54,7 +51,6 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   );
 
   // Filtra i task DISPONIBILI per il collegamento (quelli non ancora in questo progetto)
-  // Utilizzato per la ricerca
   const availableTasks = tasks.filter(t => 
     !projectTasks.some(pt => pt.id === t.id)
   );
@@ -71,12 +67,11 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
     } else {
         setLinkSuggestions([]);
     }
-  }, [linkSearch, isLinkingTask, tasks]); // Re-run when search changes
+  }, [linkSearch, isLinkingTask, tasks]);
 
   // Filtra i sotto-progetti
   const subProjects = allProjects.filter(p => p.parentProjectId === project.id);
   
-  // Calcolo statistiche
   const total = projectTasks.length;
   const completed = projectTasks.filter(t => t.status === TaskStatus.DONE).length;
   const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
@@ -86,33 +81,11 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
     setIsEditing(false);
   };
 
-  const handleQuickAddTask = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim()) return;
-
-    onCreateTask({
-      title: newTaskTitle,
-      description: '',
-      tags: [],
-      status: TaskStatus.TODO,
-      priority: undefined,
-      ownerId: currentUser.id,
-      sharedWith: [],
-      attachments: [],
-      projectIds: [project.id] // Collega a QUESTO progetto
-    });
-
-    setNewTaskTitle('');
-    setIsAddingTask(false);
-  };
-
   const handleLinkTask = async (taskToLink: Task) => {
     try {
         const currentProjectIds = taskToLink.projectIds || (taskToLink.projectId ? [taskToLink.projectId] : []);
-        // Aggiungi questo progetto se non c'è già
         if (!currentProjectIds.includes(project.id)) {
             const newProjectIds = [...currentProjectIds, project.id];
-            // Update usando dataService che gestisce anche il log
             await dataService.updateTask(taskToLink.id, { projectIds: newProjectIds } as any, currentUser, taskToLink.title);
         }
         setLinkSearch('');
@@ -126,7 +99,6 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   const handleAddSubProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSubProjectTitle.trim()) return;
-    
     try {
         await dataService.createProject({
             title: newSubProjectTitle,
@@ -136,15 +108,14 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
         setIsAddingSubProject(false);
     } catch (e) {
         console.error(e);
+        alert("Errore creazione sotto-progetto");
     }
   };
 
   const handleUnlinkTask = async (taskId: string, taskTitle: string, currentProjectIds: string[] = []) => {
     if(confirm("Scollegare questo task da questo progetto? (Il task rimarrà in altri progetti se assegnato)")) {
         try {
-            // Rimuovi questo ID progetto dall'array
             const newProjectIds = currentProjectIds.filter(id => id !== project.id);
-            
             await dataService.updateTask(taskId, { projectIds: newProjectIds } as any, currentUser, taskTitle);
         } catch (e) {
             console.error(e);
@@ -155,6 +126,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   const statusIcon = {
     [TaskStatus.TODO]: <Circle className="w-4 h-4 text-slate-400" />,
     [TaskStatus.IN_PROGRESS]: <ArrowRightCircle className="w-4 h-4 text-amber-600" />,
+    [TaskStatus.IN_WAITING]: <ArrowRightCircle className="w-4 h-4 text-orange-500" />,
     [TaskStatus.DONE]: <CheckCircle2 className="w-4 h-4 text-green-600" />,
   };
 
@@ -166,11 +138,11 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
         <div className="fixed inset-0 bg-slate-900 bg-opacity-75 transition-opacity backdrop-blur-sm" onClick={onClose}></div>
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
-        {/* Modal Panel */}
-        <div className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-5xl w-full">
+        {/* Modal Panel - REMOVED overflow-hidden from here to allow dropdowns */}
+        <div className="inline-block align-bottom bg-white rounded-2xl text-left shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-5xl w-full flex flex-col max-h-[90vh]">
           
           {/* Header */}
-          <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-start">
+          <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-start rounded-t-2xl shrink-0">
              <div className="flex items-center gap-3 flex-1">
                 <div className="bg-indigo-100 p-2 rounded-lg shrink-0">
                    <LayoutGrid className="w-6 h-6 text-indigo-600" />
@@ -208,9 +180,9 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
              </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 h-[650px]">
+          <div className="grid grid-cols-1 md:grid-cols-3 flex-1 overflow-hidden">
              
-             {/* Left: Info & Stats */}
+             {/* Left: Info & Stats & Subprojects */}
              <div className="p-6 bg-slate-50/50 border-r border-slate-100 md:col-span-1 space-y-6 overflow-y-auto">
                 <div>
                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Descrizione</label>
@@ -248,7 +220,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                        {subProjects.map(sp => (
                            <div 
                              key={sp.id} 
-                             className="flex items-center gap-2 p-2 bg-white border border-slate-200 rounded cursor-pointer hover:border-indigo-300"
+                             className="flex items-center gap-2 p-2 bg-white border border-slate-200 rounded cursor-pointer hover:border-indigo-300 shadow-sm"
                              onClick={() => onOpenSubProject(sp)}
                            >
                                <Folder className="w-4 h-4 text-indigo-400" />
@@ -262,7 +234,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                             Nuovo Sotto-Progetto
                         </Button>
                    ) : (
-                       <form onSubmit={handleAddSubProject} className="flex gap-1">
+                       <form onSubmit={handleAddSubProject} className="flex gap-1 animate-in fade-in slide-in-from-top-1">
                            <Input 
                              value={newSubProjectTitle} 
                              onChange={e => setNewSubProjectTitle(e.target.value)} 
@@ -281,14 +253,14 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
              <div className="p-6 md:col-span-2 flex flex-col h-full overflow-hidden">
                 <div className="flex justify-between items-center mb-4 shrink-0 flex-wrap gap-2">
                    <h3 className="font-bold text-slate-800">Task del Progetto</h3>
-                   <div className="flex gap-2">
+                   <div className="flex gap-2 relative">
                        {/* Button: Link Existing Task */}
                        {!isLinkingTask ? (
                            <Button variant="secondary" size="sm" icon={LinkIcon} onClick={() => setIsLinkingTask(true)}>
                                Collega Esistente
                            </Button>
                        ) : (
-                           <div className="relative flex items-center gap-2 bg-white border border-indigo-200 rounded-lg p-1 shadow-sm animate-in slide-in-from-right-5">
+                           <div className="relative flex items-center gap-2 bg-white border border-indigo-200 rounded-lg p-1 shadow-sm animate-in slide-in-from-right-5 z-[60]">
                                <Search className="w-4 h-4 text-indigo-500 ml-2" />
                                <input 
                                    className="text-sm outline-none px-2 py-1 w-48"
@@ -301,7 +273,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                                
                                {/* Dropdown Suggestions */}
                                {linkSuggestions.length > 0 && (
-                                   <div className="absolute top-full left-0 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 z-50 max-h-48 overflow-y-auto">
+                                   <div className="absolute top-full left-0 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 z-[70] max-h-48 overflow-y-auto">
                                        {linkSuggestions.map(t => (
                                            <div 
                                                key={t.id}
@@ -318,33 +290,24 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                                    </div>
                                )}
                                {linkSearch && linkSuggestions.length === 0 && (
-                                   <div className="absolute top-full left-0 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 z-50 p-3 text-xs text-slate-400 text-center">
+                                   <div className="absolute top-full left-0 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 z-[70] p-3 text-xs text-slate-400 text-center">
                                        Nessun task trovato
                                    </div>
                                )}
                            </div>
                        )}
 
-                       {/* Button: Create New Task */}
-                       <Button variant="primary" size="sm" icon={Plus} onClick={() => setIsAddingTask(true)}>
+                       {/* Button: Create New Task - Opens MAIN Modal */}
+                       <Button 
+                         variant="primary" 
+                         size="sm" 
+                         icon={Plus} 
+                         onClick={() => onOpenCreateTask(project.id)}
+                       >
                           Crea Nuovo
                        </Button>
                    </div>
                 </div>
-
-                {isAddingTask && (
-                   <form onSubmit={handleQuickAddTask} className="mb-4 bg-indigo-50 p-3 rounded-lg border border-indigo-100 flex gap-2 animate-in slide-in-from-top-2">
-                      <Input 
-                         placeholder="Titolo nuovo task..." 
-                         value={newTaskTitle} 
-                         onChange={e => setNewTaskTitle(e.target.value)}
-                         className="bg-white"
-                         autoFocus
-                      />
-                      <Button type="submit" size="sm">Aggiungi</Button>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddingTask(false)}><X className="w-4 h-4" /></Button>
-                   </form>
-                )}
 
                 <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                    {projectTasks.length === 0 ? (

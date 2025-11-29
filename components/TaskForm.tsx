@@ -3,19 +3,28 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Task, TaskStatus, TaskPriority, User, Attachment, Project } from '../types';
 import { suggestTagsWithGemini } from '../services/geminiService';
 import { authService } from '../services/authService';
-import { Button, Input, Textarea, Badge } from './UI';
-import { Sparkles, Plus, Users, UserPlus, Paperclip, Film, FileText, X, Calendar as CalendarIcon, Hash, Briefcase, LayoutGrid } from 'lucide-react';
+import { Button, Input, Textarea, Badge, Autocomplete } from './UI';
+import { Sparkles, Plus, Users, Paperclip, Film, FileText, X, Calendar as CalendarIcon, Hash, Briefcase } from 'lucide-react';
 
 interface TaskFormProps {
   initialTask?: Task | null;
   currentUser: User;
   existingTags?: string[];
   projects?: Project[];
+  initialProjectIds?: string[]; // New prop for pre-selection
   onSubmit: (task: Omit<Task, 'id' | 'createdAt'> | Task) => void;
   onCancel: () => void;
 }
 
-export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, existingTags = [], projects = [], onSubmit, onCancel }) => {
+export const TaskForm: React.FC<TaskFormProps> = ({ 
+  initialTask, 
+  currentUser, 
+  existingTags = [], 
+  projects = [], 
+  initialProjectIds = [], 
+  onSubmit, 
+  onCancel 
+}) => {
   const [title, setTitle] = useState(initialTask?.title || '');
   const [description, setDescription] = useState(initialTask?.description || '');
   const [tags, setTags] = useState<string[]>(initialTask?.tags || []);
@@ -24,93 +33,49 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
   const [dueDate, setDueDate] = useState(initialTask?.dueDate || '');
   const [attachments, setAttachments] = useState<Attachment[]>(initialTask?.attachments || []);
   
-  // Multi-Project State
+  // Multi-Project State - Initialize with prop if available
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(
-    initialTask?.projectIds || (initialTask?.projectId ? [initialTask.projectId] : [])
+    initialTask?.projectIds || 
+    (initialTask?.projectId ? [initialTask.projectId] : []) || 
+    initialProjectIds
   );
   
-  const [tagInput, setTagInput] = useState('');
   const [isGeneratingTags, setIsGeneratingTags] = useState(false);
-  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   
   // Sharing state
   const [sharedWithIds, setSharedWithIds] = useState<string[]>(initialTask?.sharedWith || []);
-  const [shareInput, setShareInput] = useState('');
-  const [shareSuggestions, setShareSuggestions] = useState<User[]>([]);
-  const [showShareDropdown, setShowShareDropdown] = useState(false);
-  const [sharedUsernames, setSharedUsernames] = useState<Record<string, string>>({}); // Cache for display
+  const [sharedUsernames, setSharedUsernames] = useState<Record<string, string>>({}); 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const tagDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Check if we are in "edit" mode vs "create" mode
   const isEdit = !!initialTask;
-  const isOwner = !initialTask || initialTask.ownerId === currentUser.id;
+  // Owner OR Admin can share
+  const canShare = !initialTask || initialTask.ownerId === currentUser.id || currentUser.role === 'ADMIN';
 
-  // Carica i nomi degli utenti condivisi all'avvio (solo visualizzazione)
+  // Load Users for Sharing Autocomplete
   useEffect(() => {
-    const loadUsernames = async () => {
-      const mapping: Record<string, string> = {};
-      for (const id of sharedWithIds) {
-        if (!sharedUsernames[id]) {
-          mapping[id] = await authService.getUsernameById(id);
-        }
-      }
-      if (Object.keys(mapping).length > 0) {
-        setSharedUsernames(prev => ({...prev, ...mapping}));
+    const fetchUsers = async () => {
+      try {
+        const users = await authService.getAllUsers();
+        setAllUsers(users);
+        
+        // Populate username cache for badges
+        const mapping: Record<string, string> = {};
+        users.forEach(u => {
+            mapping[u.id] = u.username;
+        });
+        setSharedUsernames(mapping);
+      } catch (e) {
+        console.error("Error loading users", e);
       }
     };
-    if (sharedWithIds.length > 0) loadUsernames();
-  }, [sharedWithIds]);
-
-  // Gestione ricerca utenti in tempo reale
-  useEffect(() => {
-    const searchTimer = setTimeout(async () => {
-      if (shareInput.trim().length > 0) {
-        const results = await authService.searchUsers(shareInput);
-        // Filtra: rimuovi me stesso e chi è già condiviso
-        const filtered = results.filter(u => 
-          u.id !== currentUser.id && !sharedWithIds.includes(u.id)
-        );
-        setShareSuggestions(filtered);
-        setShowShareDropdown(true);
-      } else {
-        setShareSuggestions([]);
-        setShowShareDropdown(false);
-      }
-    }, 300); // Debounce di 300ms
-
-    return () => clearTimeout(searchTimer);
-  }, [shareInput, sharedWithIds, currentUser.id]);
-
-  // Chiudi dropdown se clicco fuori
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowShareDropdown(false);
-      }
-      if (tagDropdownRef.current && !tagDropdownRef.current.contains(event.target as Node)) {
-        setShowTagSuggestions(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    fetchUsers();
   }, []);
 
-  const handleAddTag = () => {
-    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
-      setTags([...tags, tagInput.trim()]);
-      setTagInput('');
-      setShowTagSuggestions(false);
-    }
-  };
-
-  const handleAddSuggestedTag = (tag: string) => {
-    if (!tags.includes(tag)) {
-      setTags([...tags, tag]);
-      setTagInput('');
-      setShowTagSuggestions(false);
+  const handleAddTag = (tag: string) => {
+    if (tag.trim() && !tags.includes(tag.trim())) {
+      setTags([...tags, tag.trim()]);
     }
   };
 
@@ -132,11 +97,10 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
     }
   };
 
-  const handleSelectUser = (user: User) => {
-    setSharedWithIds([...sharedWithIds, user.id]);
-    setSharedUsernames(prev => ({...prev, [user.id]: user.username}));
-    setShareInput('');
-    setShowShareDropdown(false);
+  const handleSelectUser = (userId: string) => {
+    if (!sharedWithIds.includes(userId)) {
+        setSharedWithIds([...sharedWithIds, userId]);
+    }
   };
 
   const handleRemoveShare = (userId: string) => {
@@ -151,7 +115,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
         const file = e.target.files[i];
         
         if (file.size > 300 * 1024) {
-          alert(`Il file "${file.name}" è troppo grande (>300KB). Firestore ha limiti severi. Usa file piccoli.`);
+          alert(`Il file "${file.name}" è troppo grande (>300KB).`);
           continue;
         }
 
@@ -175,14 +139,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
           data: base64
         });
       }
-      
-      const currentSize = attachments.reduce((acc, curr) => acc + curr.size, 0);
-      const newSize = newAttachments.reduce((acc, curr) => acc + curr.size, 0);
-      
-      if (currentSize + newSize > 800 * 1024) {
-        alert("Attenzione: La dimensione totale degli allegati supera il limite di sicurezza (800KB). Alcuni file potrebbero non essere salvati.");
-      }
-
       setAttachments(prev => [...prev, ...newAttachments]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
@@ -193,11 +149,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
   };
 
   const handleProjectToggle = (projectId: string) => {
-    if (projectId === '') {
-        // Nessun progetto
-        setSelectedProjectIds([]);
-        return;
-    }
+    if (projectId === '') return;
     if (selectedProjectIds.includes(projectId)) {
         setSelectedProjectIds(prev => prev.filter(id => id !== projectId));
     } else {
@@ -209,7 +161,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
     e.preventDefault();
     if (!title.trim()) return;
 
-    // Prevenzione doppio invio
     const submitBtn = e.currentTarget.querySelector('button[type="submit"]') as HTMLButtonElement;
     if(submitBtn) submitBtn.disabled = true;
 
@@ -224,7 +175,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
       ownerId: initialTask ? initialTask.ownerId : currentUser.id,
       sharedWith: sharedWithIds,
       projectIds: selectedProjectIds,
-      projectId: undefined // Ensure legacy field is cleared
+      projectId: undefined
     };
 
     if (isEdit && initialTask) {
@@ -237,15 +188,10 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
     }
   };
 
-  // Filter suggested tags
-  const tagSuggestions = existingTags.filter(t => 
-    t.toLowerCase().includes(tagInput.toLowerCase()) && 
-    !tags.includes(t)
-  );
-
   const statusLabels: Record<TaskStatus, string> = {
     [TaskStatus.TODO]: 'Da fare',
     [TaskStatus.IN_PROGRESS]: 'In corso',
+    [TaskStatus.IN_WAITING]: 'In Attesa',
     [TaskStatus.DONE]: 'Completato',
   };
 
@@ -281,9 +227,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
                 <Briefcase className="w-4 h-4" /> Progetti (Task Madre)
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
-                {selectedProjectIds.length === 0 && (
-                    <span className="text-xs text-slate-400 italic">Nessun progetto selezionato</span>
-                )}
                 {selectedProjectIds.map(pid => {
                     const proj = projects.find(p => p.id === pid);
                     return (
@@ -299,12 +242,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
                 onChange={(e) => {
                     if (e.target.value) {
                         handleProjectToggle(e.target.value);
-                        e.target.value = ''; // Reset select
+                        e.target.value = '';
                     }
                 }}
-                value=""
             >
-                <option value="" disabled>Aggiungi a un progetto...</option>
+                <option value="">Aggiungi a un progetto...</option>
                 {projects
                     .filter(p => !selectedProjectIds.includes(p.id))
                     .map(p => (
@@ -318,12 +260,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Stato</label>
-            <div className="flex gap-2">
+            <div className="flex gap-1 overflow-x-auto">
               {(Object.values(TaskStatus) as TaskStatus[]).map((s) => (
                 <label 
                   key={s} 
                   className={`
-                    flex-1 cursor-pointer border rounded-lg px-2 py-2 text-center text-xs font-medium transition-all
+                    flex-1 cursor-pointer border rounded-lg px-2 py-2 text-center text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap
                     ${status === s 
                       ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600' 
                       : 'border-slate-200 hover:border-slate-300 text-slate-600 hover:bg-slate-50'
@@ -405,12 +347,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
                   <FileText className="w-8 h-8 text-slate-400" />
                 )}
                 
-                {att.type !== 'IMAGE' && (
-                  <span className="absolute bottom-1 text-[9px] text-slate-500 w-full text-center px-1 truncate">
-                    {att.name}
-                  </span>
-                )}
-
                 <button
                   type="button"
                   onClick={() => handleRemoveAttachment(att.id)}
@@ -423,30 +359,19 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
           </div>
         </div>
 
-        {/* Tags Section */}
-        <div className="relative" ref={tagDropdownRef}>
+        {/* Tags Section with Autocomplete */}
+        <div className="relative">
           <label className="block text-sm font-medium text-slate-700 mb-1">Tag</label>
           <div className="flex gap-2 mb-2">
-            <Input 
-              value={tagInput}
-              onChange={(e) => {
-                setTagInput(e.target.value);
-                setShowTagSuggestions(true);
-              }}
-              onFocus={() => {
-                if (tagInput && tagSuggestions.length > 0) setShowTagSuggestions(true);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddTag();
-                }
-              }}
-              placeholder="Aggiungi tag..."
-              className="flex-1"
-              autoComplete="off"
-            />
-            <Button type="button" variant="secondary" onClick={handleAddTag} icon={Plus} disabled={!tagInput.trim()}>Agg.</Button>
+            <div className="flex-1">
+              <Autocomplete
+                placeholder="Aggiungi tag..."
+                options={existingTags.map(t => ({ label: t, value: t }))}
+                onSelect={(val) => handleAddTag(val)}
+                onCreate={(val) => handleAddTag(val)}
+                className="w-full"
+              />
+            </div>
             <Button 
               type="button" 
               variant="primary" 
@@ -460,25 +385,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
             </Button>
           </div>
           
-          {/* Tag Suggestions Dropdown */}
-          {showTagSuggestions && tagInput && tagSuggestions.length > 0 && (
-            <div className="absolute z-20 top-[74px] left-0 w-full md:w-2/3 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-              {tagSuggestions.map((tag, index) => (
-                <div 
-                  key={index}
-                  className="px-4 py-2 hover:bg-indigo-50 cursor-pointer flex items-center gap-2 text-sm text-slate-700"
-                  onMouseDown={(e) => {
-                    e.preventDefault(); // Prevent input blur
-                    handleAddSuggestedTag(tag);
-                  }}
-                >
-                  <Hash className="w-3 h-3 text-slate-400" />
-                  {tag}
-                </div>
-              ))}
-            </div>
-          )}
-
           <div className="flex flex-wrap gap-2 min-h-[32px]">
             {tags.map(tag => (
               <Badge key={tag} onRemove={() => handleRemoveTag(tag)} color="indigo">
@@ -488,55 +394,21 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
           </div>
         </div>
 
-        {/* Share Section - Only Owner can manage shares */}
-        {isOwner && (
-          <div className="bg-slate-50 p-4 rounded-lg border border-slate-200" ref={dropdownRef}>
+        {/* Share Section - With Autocomplete */}
+        {canShare && (
+          <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
             <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
               <Users className="w-4 h-4" /> Condividi con altri
             </label>
             <div className="relative mb-2">
-              <Input 
-                value={shareInput}
-                onChange={(e) => {
-                   setShareInput(e.target.value);
-                   // Se svuoto l'input, chiudo dropdown
-                   if (e.target.value.length === 0) setShowShareDropdown(false);
-                }}
-                onFocus={() => {
-                  if (shareInput.length > 0 && shareSuggestions.length > 0) setShowShareDropdown(true);
-                }}
+              <Autocomplete
                 placeholder="Cerca utente per nome o email..."
-                className="flex-1 bg-white w-full"
-                icon={UserPlus}
+                options={allUsers
+                  .filter(u => u.id !== currentUser.id && !sharedWithIds.includes(u.id))
+                  .map(u => ({ label: `${u.username} (${u.email})`, value: u.id }))}
+                onSelect={handleSelectUser}
+                className="w-full bg-white"
               />
-              
-              {/* Dropdown dei suggerimenti */}
-              {showShareDropdown && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {shareSuggestions.length > 0 ? (
-                    shareSuggestions.map(user => (
-                      <div 
-                        key={user.id}
-                        className="px-4 py-2 hover:bg-indigo-50 cursor-pointer flex items-center justify-between border-b border-slate-50 last:border-0"
-                        onMouseDown={() => handleSelectUser(user)} // onMouseDown fires before Input blur
-                      >
-                        <div className="flex items-center gap-3">
-                           <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
-                             {user.username.charAt(0).toUpperCase()}
-                           </div>
-                           <div className="flex flex-col">
-                             <span className="text-sm font-medium text-slate-800">{user.username}</span>
-                             <span className="text-xs text-slate-500">{user.email}</span>
-                           </div>
-                        </div>
-                        <Plus className="w-4 h-4 text-slate-400" />
-                      </div>
-                    ))
-                  ) : (
-                    <div className="px-4 py-3 text-sm text-slate-400 text-center">Nessun utente trovato</div>
-                  )}
-                </div>
-              )}
             </div>
             
             <div className="flex flex-wrap gap-2">

@@ -12,10 +12,11 @@ interface ProjectListProps {
   tasks: Task[];
   currentUser: User;
   onCreateTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
-  onEditTask: (task: Task) => void; 
+  onEditTask: (task: Task) => void;
+  onOpenCreateTask: (projectId?: string) => void; // New prop
 }
 
-export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, currentUser, onCreateTask, onEditTask }) => {
+export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, currentUser, onCreateTask, onEditTask, onOpenCreateTask }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
@@ -152,6 +153,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, curre
            onUpdateProject={handleUpdateDetails}
            onCreateTask={onCreateTask}
            onEditTask={onEditTask} 
+           onOpenCreateTask={onOpenCreateTask} // Pass new handler
            onOpenSubProject={(sub) => setSelectedProject(sub)} // Navigazione
         />
       )}

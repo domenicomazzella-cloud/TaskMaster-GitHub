@@ -18,6 +18,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
   const statusConfig = {
     [TaskStatus.TODO]: { icon: Circle, color: 'text-slate-500', bg: 'bg-slate-100', text: 'Da Fare' },
     [TaskStatus.IN_PROGRESS]: { icon: ArrowRightCircle, color: 'text-yellow-600', bg: 'bg-yellow-100', text: 'In Corso' },
+    [TaskStatus.IN_WAITING]: { icon: Clock, color: 'text-orange-600', bg: 'bg-orange-100', text: 'In Attesa' },
     [TaskStatus.DONE]: { icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-100', text: 'Completato' },
   };
 

@@ -2,7 +2,7 @@
 import React from 'react';
 import { Task, TaskStatus, TaskPriority, UserRole } from '../types';
 import { Badge } from './UI';
-import { CheckCircle2, Circle, ArrowRightCircle, Trash2, Edit, Users, Paperclip, Film, FileText, Calendar, AlertCircle, Flag, Crown, Tag, LayoutGrid } from 'lucide-react';
+import { CheckCircle2, Circle, ArrowRightCircle, Trash2, Edit, Users, Paperclip, Film, FileText, Calendar, AlertCircle, Flag, Crown, Tag, LayoutGrid, Clock } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
@@ -28,12 +28,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, current
   const statusIcon = {
     [TaskStatus.TODO]: <Circle className="w-5 h-5 text-slate-400" />,
     [TaskStatus.IN_PROGRESS]: <ArrowRightCircle className="w-5 h-5 text-amber-600" />,
+    [TaskStatus.IN_WAITING]: <Clock className="w-5 h-5 text-orange-500" />,
     [TaskStatus.DONE]: <CheckCircle2 className="w-5 h-5 text-emerald-600" />,
   };
 
   const statusText: Record<TaskStatus, string> = {
     [TaskStatus.TODO]: "DA FARE",
     [TaskStatus.IN_PROGRESS]: "IN CORSO",
+    [TaskStatus.IN_WAITING]: "IN ATTESA",
     [TaskStatus.DONE]: "COMPLETATO",
   };
 
@@ -77,6 +79,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, current
     let next = TaskStatus.TODO;
     if (task.status === TaskStatus.TODO) next = TaskStatus.IN_PROGRESS;
     else if (task.status === TaskStatus.IN_PROGRESS) next = TaskStatus.DONE;
+    else if (task.status === TaskStatus.IN_WAITING) next = TaskStatus.IN_PROGRESS;
     
     if (next === TaskStatus.DONE) {
       setIsAnimating(true);

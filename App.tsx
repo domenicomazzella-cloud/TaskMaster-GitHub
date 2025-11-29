@@ -35,6 +35,9 @@ const App: React.FC = () => {
   const [showPwdModal, setShowPwdModal] = useState(false); 
   const [newPassword, setNewPassword] = useState('');
   
+  // Pre-selection state for Task Form
+  const [preselectedProjectIds, setPreselectedProjectIds] = useState<string[]>([]);
+
   // Navigation & Views
   const [activeTab, setActiveTab] = useState<'TASKS' | 'PROJECTS' | 'ADMIN'>('TASKS');
   const [viewMode, setViewMode] = useState<'LIST' | 'CALENDAR'>('LIST');
@@ -101,7 +104,6 @@ const App: React.FC = () => {
     }
 
     const unsubscribe = dataService.subscribeToTasks((fetchedTasks) => {
-      // Notification logic handled by backend/service in future or here if needed
       prevTasksRef.current = fetchedTasks;
       setTasks(fetchedTasks);
       
@@ -197,6 +199,14 @@ const App: React.FC = () => {
 
   const handleEditClick = (task: Task) => {
     setEditingTask(task);
+    setPreselectedProjectIds([]); // Reset when editing existing
+    setIsModalOpen(true);
+  };
+
+  // NEW: Handle opening create modal from project view
+  const handleOpenCreateTask = (projectId?: string) => {
+    setEditingTask(null);
+    setPreselectedProjectIds(projectId ? [projectId] : []);
     setIsModalOpen(true);
   };
 
@@ -207,6 +217,7 @@ const App: React.FC = () => {
   const handleModalClose = () => {
     setIsModalOpen(false);
     setEditingTask(null);
+    setPreselectedProjectIds([]);
   };
 
   const addTagFilter = (tag: string) => {
@@ -420,7 +431,7 @@ const App: React.FC = () => {
 
               {activeTab === 'TASKS' && (
                 <Button 
-                  onClick={() => { setEditingTask(null); setIsModalOpen(true); }}
+                  onClick={() => { setEditingTask(null); setPreselectedProjectIds([]); setIsModalOpen(true); }}
                   icon={Plus}
                   className="hidden sm:flex"
                 >
@@ -439,10 +450,11 @@ const App: React.FC = () => {
         ) : activeTab === 'PROJECTS' ? (
           <ProjectList 
             projects={projects}
-            tasks={tasks}
+            tasks={visibleTasks} // Pass visible tasks so permissions are respected
             currentUser={user}
             onCreateTask={handleCreateTask}
             onEditTask={handleEditClick} 
+            onOpenCreateTask={handleOpenCreateTask} // Pass the handler
           />
         ) : (
           <>
@@ -519,6 +531,7 @@ const App: React.FC = () => {
                     <option value="ALL">Tutti gli stati</option>
                     <option value={TaskStatus.TODO}>Da fare</option>
                     <option value={TaskStatus.IN_PROGRESS}>In corso</option>
+                    <option value={TaskStatus.IN_WAITING}>In Attesa</option>
                     <option value={TaskStatus.DONE}>Completato</option>
                   </select>
                 </div>
@@ -602,6 +615,7 @@ const App: React.FC = () => {
                 onTaskClick={handleTaskClick}
                 onCreateTaskForDate={(date) => {
                   setEditingTask(null);
+                  setPreselectedProjectIds([]);
                   setIsModalOpen(true);
                 }}
               />
@@ -613,7 +627,7 @@ const App: React.FC = () => {
       {/* Modals ... */}
       {activeTab === 'TASKS' && (
         <button 
-          onClick={() => { setEditingTask(null); setIsModalOpen(true); }}
+          onClick={() => { setEditingTask(null); setPreselectedProjectIds([]); setIsModalOpen(true); }}
           className="fixed bottom-6 right-6 sm:hidden p-4 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 z-40"
         >
           <Plus className="w-6 h-6" />
@@ -640,6 +654,7 @@ const App: React.FC = () => {
                   currentUser={user}
                   existingTags={allGlobalTags}
                   projects={projects}
+                  initialProjectIds={preselectedProjectIds} // Pass pre-selected projects
                   onSubmit={editingTask ? (t) => handleUpdateTask({...t, id: editingTask.id, createdAt: editingTask.createdAt} as Task) : handleCreateTask}
                   onCancel={handleModalClose}
                 />

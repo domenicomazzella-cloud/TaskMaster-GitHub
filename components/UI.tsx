@@ -181,3 +181,92 @@ export const Badge: React.FC<BadgeProps> = ({ children, color = 'slate', onClick
     </span>
   );
 };
+
+// --- Autocomplete ---
+interface AutocompleteProps {
+  options: { value: string; label: string }[];
+  onSelect: (value: string) => void;
+  onCreate?: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+}
+
+export const Autocomplete: React.FC<AutocompleteProps> = ({ 
+  options, 
+  onSelect, 
+  onCreate, 
+  placeholder, 
+  className = '' 
+}) => {
+  const [query, setQuery] = React.useState('');
+  const [isOpen, setIsOpen] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  const filteredOptions = options.filter(opt => 
+    opt.label.toLowerCase().includes(query.toLowerCase())
+  );
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (val: string) => {
+    onSelect(val);
+    setQuery('');
+    setIsOpen(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (isOpen && filteredOptions.length > 0) {
+        handleSelect(filteredOptions[0].value);
+      } else if (onCreate && query.trim()) {
+        onCreate(query.trim());
+        setQuery('');
+        setIsOpen(false);
+      }
+    }
+  };
+
+  return (
+    <div className={`relative ${className}`} ref={containerRef}>
+      <input
+        type="text"
+        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+        placeholder={placeholder}
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setIsOpen(true); }}
+        onFocus={() => setIsOpen(true)}
+        onKeyDown={handleKeyDown}
+      />
+      {isOpen && (filteredOptions.length > 0 || (onCreate && query)) && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          {filteredOptions.map((opt) => (
+            <div
+              key={opt.value}
+              className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm text-slate-700"
+              onClick={() => handleSelect(opt.value)}
+            >
+              {opt.label}
+            </div>
+          ))}
+          {onCreate && query && !filteredOptions.some(o => o.label.toLowerCase() === query.toLowerCase()) && (
+            <div
+              className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm text-indigo-600 font-medium border-t border-slate-100"
+              onClick={() => { onCreate(query); setQuery(''); setIsOpen(false); }}
+            >
+              Crea "{query}"
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
