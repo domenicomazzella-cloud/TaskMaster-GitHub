@@ -124,6 +124,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, curre
                     <ProjectCard 
                     project={proj} 
                     tasks={tasks} // La card calcolerà i task corretti
+                    currentUserRole={currentUser.role}
+                    currentUserId={currentUser.id}
                     onDelete={() => handleDelete(proj.id, proj.title)}
                     onUpdateStatus={(id, s) => handleUpdateStatus(id, s, proj.title)}
                     onClick={(p) => setSelectedProject(p)}

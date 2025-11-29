@@ -5,7 +5,9 @@ import { authService } from '../services/authService';
 import { Button, Input, Select, Badge, Card } from './UI';
 import { TeamManager } from './TeamManager';
 import { ActivityLog } from './ActivityLog';
-import { UserPlus, Trash2, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Check, Ban, KeyRound, Edit, History, X, Copy, Link as LinkIcon, RotateCcw } from 'lucide-react';
+import { UserPlus, Trash2, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Check, Ban, KeyRound, Edit, History, X, Copy, Link as LinkIcon, RotateCcw, Wrench, AlertTriangle } from 'lucide-react';
+import { dataService } from '../services/dataService';
+import { logService } from '../services/logService';
 
 type SortKey = 'username' | 'email' | 'role' | 'status' | 'team';
 
@@ -42,11 +44,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'DELETED'>('ACTIVE');
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'username', direction: 'asc' });
 
-  const [viewSection, setViewSection] = useState<'USERS' | 'TEAMS' | 'LOGS'>('USERS');
+  const [viewSection, setViewSection] = useState<'USERS' | 'TEAMS' | 'LOGS' | 'MAINTENANCE'>('USERS');
 
   useEffect(() => {
     setAppUrl(window.location.origin);
-    if (viewSection !== 'LOGS') {
+    if (viewSection !== 'LOGS' && viewSection !== 'MAINTENANCE') {
       loadData();
     }
   }, [viewSection]);
@@ -157,6 +159,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
     loadData();
   };
 
+  // Maintenance Functions
+  const handleClearLogs = async () => {
+    if (confirm("Sei sicuro? Questa azione eliminerà TUTTI i log di sistema irreversibilmente.")) {
+      await logService.clearAllLogs();
+      alert("Log svuotati.");
+    }
+  };
+
+  const handleDeleteOrphanTasks = async () => {
+    if (confirm("Eliminare i task senza proprietario?")) {
+      const count = await dataService.deleteOrphanTasks(currentUser!);
+      alert(`Eliminati ${count} task orfani.`);
+    }
+  };
+
+  const handleDeleteArchivedProjects = async () => {
+    if (confirm("Eliminare definitivamente tutti i progetti archiviati?")) {
+      const count = await dataService.deleteArchivedProjects(currentUser!);
+      alert(`Eliminati ${count} progetti.`);
+    }
+  };
+
   const handleSort = (key: SortKey) => {
     setSortConfig(current => ({
       key,
@@ -257,6 +281,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
            <History className="w-4 h-4" />
            Registro Sistema
          </button>
+         <button 
+           onClick={() => setViewSection('MAINTENANCE')}
+           className={`px-4 py-2 font-medium text-sm rounded-lg transition-colors whitespace-nowrap flex items-center gap-2 ${viewSection === 'MAINTENANCE' ? 'bg-red-50 text-red-700' : 'text-slate-500 hover:text-slate-700'}`}
+         >
+           <Wrench className="w-4 h-4" />
+           Manutenzione
+         </button>
       </div>
 
       {viewSection === 'LOGS' && (
@@ -269,6 +300,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
             />
           )}
         </Card>
+      )}
+
+      {viewSection === 'MAINTENANCE' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="p-6 flex flex-col items-center text-center space-y-4 border-l-4 border-l-red-500">
+             <div className="p-3 bg-red-100 rounded-full text-red-600">
+               <Trash2 className="w-8 h-8" />
+             </div>
+             <div>
+               <h3 className="font-bold text-slate-800">Svuota Registro Attività</h3>
+               <p className="text-sm text-slate-500">Elimina irreversibilmente tutti i log storici.</p>
+             </div>
+             <Button variant="danger" onClick={handleClearLogs} className="w-full">Esegui Pulizia</Button>
+          </Card>
+
+          <Card className="p-6 flex flex-col items-center text-center space-y-4 border-l-4 border-l-orange-500">
+             <div className="p-3 bg-orange-100 rounded-full text-orange-600">
+               <AlertTriangle className="w-8 h-8" />
+             </div>
+             <div>
+               <h3 className="font-bold text-slate-800">Pulizia Task Orfani</h3>
+               <p className="text-sm text-slate-500">Rimuove task senza un proprietario valido.</p>
+             </div>
+             <Button variant="secondary" onClick={handleDeleteOrphanTasks} className="w-full text-orange-600 hover:bg-orange-50 border-orange-200">Scansiona ed Elimina</Button>
+          </Card>
+
+          <Card className="p-6 flex flex-col items-center text-center space-y-4 border-l-4 border-l-slate-500">
+             <div className="p-3 bg-slate-100 rounded-full text-slate-600">
+               <History className="w-8 h-8" />
+             </div>
+             <div>
+               <h3 className="font-bold text-slate-800">Elimina Progetti Archiviati</h3>
+               <p className="text-sm text-slate-500">Rimuove definitivamente i progetti in stato ARCHIVED.</p>
+             </div>
+             <Button variant="secondary" onClick={handleDeleteArchivedProjects} className="w-full">Elimina Definitivamente</Button>
+          </Card>
+        </div>
       )}
 
       {viewSection === 'TEAMS' && <TeamManager currentUser={currentUser} />}

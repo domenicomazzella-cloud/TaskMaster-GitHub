@@ -6,7 +6,9 @@ import {
   where, 
   getDocs, 
   orderBy, 
-  limit 
+  limit,
+  deleteDoc,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { LogEntry, LogAction, User, UserRole } from '../types';
@@ -95,5 +97,18 @@ export const logService = {
         return [];
       }
     }
+  },
+
+  // Admin Only: Clear all logs
+  clearAllLogs: async () => {
+    const q = query(collection(db, LOGS_COLLECTION), limit(500)); // Limit batch size for safety
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(db);
+    
+    snapshot.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
   }
 };

@@ -126,3 +126,14 @@ export interface LogEntry {
   details: string;      // Descrizione leggibile (es. "Status cambiato da TODO a DONE")
   timestamp: string;    // ISO Date
 }
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'INFO' | 'WARNING' | 'SUCCESS' | 'ERROR';
+  read: boolean;
+  createdAt: string;
+  link?: string;
+}

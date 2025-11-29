@@ -1,13 +1,14 @@
 
 import React from 'react';
-import { Task, TaskStatus, TaskPriority } from '../types';
+import { Task, TaskStatus, TaskPriority, UserRole } from '../types';
 import { Badge } from './UI';
 import { CheckCircle2, Circle, ArrowRightCircle, Trash2, Edit, Users, Paperclip, Film, FileText, Calendar, AlertCircle, Flag, Crown, Tag, LayoutGrid } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
   currentUserId: string;
-  projectNames?: string[]; // Array of project names
+  currentUserRole?: UserRole; // Added role prop
+  projectNames?: string[]; 
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
   onTagClick: (tag: string) => void;
@@ -15,8 +16,11 @@ interface TaskCardProps {
   onClick?: (task: Task) => void;
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, projectNames = [], onEdit, onDelete, onTagClick, handleStatusChange, onClick }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, currentUserRole, projectNames = [], onEdit, onDelete, onTagClick, handleStatusChange, onClick }) => {
   const isOwner = task.ownerId === currentUserId;
+  // Admin can delete ANY task. Owner can delete their own.
+  const canDelete = isOwner || currentUserRole === UserRole.ADMIN;
+  
   const attachments = task.attachments || [];
   const [isAnimating, setIsAnimating] = React.useState(false);
   const priority = task.priority || TaskPriority.MEDIUM; 
@@ -167,11 +171,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, project
           >
             <Edit className="w-4 h-4" />
           </button>
-          {isOwner && (
+          {canDelete && (
             <button 
               onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
               className="p-1.5 bg-white/60 hover:bg-white rounded-full text-slate-400 hover:text-red-600 transition-colors shadow-sm"
-              title="Elimina"
+              title="Elimina (Admin/Proprietario)"
             >
               <Trash2 className="w-4 h-4" />
             </button>

@@ -15,6 +15,7 @@ import { dataService } from './services/dataService';
 import { notificationService } from './services/notificationService';
 import { isFirebaseConfigured } from './firebase';
 import { Plus, Search, Filter, X, Layout, List, LogOut, ShieldCheck, CheckSquare, Tag, Calendar as CalendarIcon, Bell, BellOff, History, KeyRound, Users, Share2, LayoutGrid } from 'lucide-react';
+import { NotificationCenter } from './components/NotificationCenter';
 
 const App: React.FC = () => {
   // --- Auth State ---
@@ -89,8 +90,6 @@ const App: React.FC = () => {
       }
     });
     
-    setNotifPermission(notificationService.getPermissionState());
-
     return () => unsubscribe();
   }, []);
 
@@ -102,8 +101,7 @@ const App: React.FC = () => {
     }
 
     const unsubscribe = dataService.subscribeToTasks((fetchedTasks) => {
-      checkNotifications(fetchedTasks, prevTasksRef.current, user);
-      
+      // Notification logic handled by backend/service in future or here if needed
       prevTasksRef.current = fetchedTasks;
       setTasks(fetchedTasks);
       
@@ -127,57 +125,6 @@ const App: React.FC = () => {
     });
     return () => unsubscribe();
   }, [user]);
-
-  // --- Notification Logic ---
-  const checkNotifications = (currentTasks: Task[], prevTasks: Task[], currentUser: User) => {
-    if (notificationService.getPermissionState() !== 'granted') return;
-
-    currentTasks.forEach(task => {
-      if (task.ownerId !== currentUser.id && task.sharedWith.includes(currentUser.id)) {
-        const prevTask = prevTasks.find(t => t.id === task.id);
-        const wasSharedWithMe = prevTask ? prevTask.sharedWith.includes(currentUser.id) : false;
-
-        if (!wasSharedWithMe) {
-          notificationService.sendNotification(
-            "Nuovo task condiviso",
-            `${task.ownerUsername || 'Qualcuno'} ha condiviso con te: "${task.title}"`,
-            `shared_${task.id}`
-          );
-        }
-      }
-
-      if (task.dueDate && task.status !== TaskStatus.DONE) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        const due = new Date(task.dueDate);
-        const dueDay = new Date(task.dueDate);
-        dueDay.setHours(0, 0, 0, 0);
-
-        const diffTime = dueDay.getTime() - today.getTime();
-        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)); 
-
-        if (diffDays >= 0 && diffDays <= 1) {
-          const when = diffDays === 0 ? 'oggi' : 'domani';
-          const notifTag = `deadline_${task.id}_${due.toISOString().split('T')[0]}`;
-          
-          notificationService.sendNotification(
-            "Task in scadenza",
-            `Il task "${task.title}" scade ${when}!`,
-            notifTag
-          );
-        }
-      }
-    });
-  };
-
-  const handleEnableNotifications = async () => {
-    const granted = await notificationService.requestPermission();
-    setNotifPermission(granted ? 'granted' : 'denied');
-    if (granted) {
-      checkNotifications(tasks, [], user!);
-    }
-  };
 
   const handleChangePassword = async () => {
     if (!newPassword || newPassword.length < 6) {
@@ -220,7 +167,6 @@ const App: React.FC = () => {
   const handleUpdateTask = async (updatedTask: Task) => {
     if (!user) return;
     const { id, ...data } = updatedTask;
-    notificationService.resetNotificationState(`deadline_${id}`);
     
     try {
       await dataService.updateTask(id, data, user, updatedTask.title); 
@@ -390,7 +336,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
       
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-2">
@@ -442,21 +388,7 @@ const App: React.FC = () => {
                 <History className="w-5 h-5" />
               </Button>
 
-              {notifPermission === 'default' && (
-                <Button 
-                  variant="ghost" 
-                  onClick={handleEnableNotifications}
-                  className="text-slate-500 hover:text-indigo-600"
-                  title="Abilita Notifiche"
-                >
-                  <Bell className="w-5 h-5" />
-                </Button>
-              )}
-              {notifPermission === 'denied' && (
-                 <Button variant="ghost" className="text-slate-300 cursor-not-allowed" title="Notifiche bloccate">
-                   <BellOff className="w-5 h-5" />
-                 </Button>
-              )}
+              <NotificationCenter currentUser={user} />
 
               <div className="hidden md:flex items-center text-sm text-slate-600 border-l border-slate-200 pl-4 ml-2">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold mr-2 ${user.role === UserRole.ADMIN ? 'bg-indigo-600' : user.role === UserRole.MANAGER ? 'bg-green-600' : 'bg-slate-400'}`}>
@@ -634,7 +566,8 @@ const App: React.FC = () => {
                         key={task.id} 
                         task={task} 
                         currentUserId={user.id}
-                        projectNames={projectNames} // Passa lista nomi progetti
+                        currentUserRole={user.role} // Pass role for admin powers
+                        projectNames={projectNames} 
                         onEdit={handleEditClick}
                         onDelete={handleDeleteTask}
                         onTagClick={addTagFilter}
@@ -688,7 +621,7 @@ const App: React.FC = () => {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-[60] overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 bg-slate-900 bg-opacity-75 transition-opacity" onClick={handleModalClose}></div>
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>

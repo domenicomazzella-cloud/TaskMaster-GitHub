@@ -1,24 +1,29 @@
 
 import React from 'react';
-import { Project, Task, TaskStatus } from '../types';
+import { Project, Task, TaskStatus, UserRole } from '../types';
 import { Card, Button } from './UI';
 import { Briefcase, CheckCircle2, Trash2, Calendar, Archive, ExternalLink } from 'lucide-react';
 
 interface ProjectCardProps {
   project: Project;
-  tasks: Task[]; // All tasks
+  tasks: Task[];
+  currentUserRole?: UserRole; // Added role prop
+  currentUserId: string;
   onDelete: (id: string) => void;
   onUpdateStatus: (id: string, status: 'ACTIVE' | 'COMPLETED' | 'ARCHIVED') => void;
-  onClick: (project: Project) => void; // Nuova prop per aprire il dettaglio
+  onClick: (project: Project) => void;
 }
 
-export const ProjectCard: React.FC<ProjectCardProps> = ({ project, tasks, onDelete, onUpdateStatus, onClick }) => {
+export const ProjectCard: React.FC<ProjectCardProps> = ({ project, tasks, currentUserRole, currentUserId, onDelete, onUpdateStatus, onClick }) => {
   // Filtra task del progetto
-  const projectTasks = tasks.filter(t => t.projectId === project.id);
+  const projectTasks = tasks.filter(t => t.projectId === project.id || (t.projectIds && t.projectIds.includes(project.id)));
   const totalTasks = projectTasks.length;
   const completedTasks = projectTasks.filter(t => t.status === TaskStatus.DONE).length;
   const hasPendingTasks = totalTasks > completedTasks;
   
+  const isOwner = project.ownerId === currentUserId;
+  const canDelete = isOwner || currentUserRole === UserRole.ADMIN;
+
   const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
   
   const statusStyles = {
@@ -123,9 +128,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, tasks, onDele
                <option value="COMPLETED">COMPLETATO</option>
                <option value="ARCHIVED">ARCHIVIATO</option>
             </select>
-            <Button variant="ghost" onClick={() => onDelete(project.id)} className="text-slate-300 hover:text-red-500 p-1 h-auto ml-2" title="Elimina Progetto">
-               <Trash2 className="w-4 h-4" />
-            </Button>
+            {canDelete && (
+              <Button variant="ghost" onClick={() => onDelete(project.id)} className="text-slate-300 hover:text-red-500 p-1 h-auto ml-2" title="Elimina Progetto">
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
          </div>
       </div>
     </Card>
