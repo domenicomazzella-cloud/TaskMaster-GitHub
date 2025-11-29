@@ -33,10 +33,20 @@ export const dataService = {
     const q = query(collection(db, TASKS_COLLECTION), orderBy('createdAt', 'desc'));
     
     return onSnapshot(q, (snapshot) => {
-      const tasks = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id
-      })) as Task[];
+      const tasks = snapshot.docs.map(doc => {
+        const data = doc.data();
+        // Backward compatibility: map projectId to projectIds if projectIds is missing
+        let projectIds = data.projectIds || [];
+        if (projectIds.length === 0 && data.projectId) {
+          projectIds = [data.projectId];
+        }
+
+        return {
+          ...data,
+          id: doc.id,
+          projectIds
+        };
+      }) as Task[];
       callback(tasks);
     });
   },
@@ -49,6 +59,9 @@ export const dataService = {
     
     // RIMUOVE I CAMPI UNDEFINED (es. projectId se non selezionato)
     const taskData = cleanData(rawData);
+
+    // Rimuoviamo projectId legacy se presente nei dati raw, usiamo solo projectIds
+    if (taskData.projectId) delete taskData.projectId;
 
     const docRef = await addDoc(collection(db, TASKS_COLLECTION), taskData);
     
@@ -67,6 +80,9 @@ export const dataService = {
     
     // RIMUOVE I CAMPI UNDEFINED
     const updatesCleaned = cleanData(updates);
+    
+    // Cleanup legacy
+    if (updatesCleaned.projectId) delete updatesCleaned.projectId;
 
     await updateDoc(docRef, updatesCleaned);
 
@@ -116,24 +132,27 @@ export const dataService = {
     });
   },
 
-  createProject: async (title: string, description: string, currentUser: User) => {
+  createProject: async (projectData: Partial<Project>, currentUser: User) => {
     const project: Omit<Project, 'id'> = {
-      title,
-      description,
+      title: projectData.title || 'Nuovo Progetto',
+      description: projectData.description || '',
       ownerId: currentUser.id,
       createdAt: new Date().toISOString(),
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      sharedWith: projectData.sharedWith || [],
+      parentProjectId: projectData.parentProjectId || undefined, // Supporto Sub-Progetti
+      priority: projectData.priority || undefined
     };
     
-    const projectData = cleanData(project);
-    const docRef = await addDoc(collection(db, PROJECTS_COLLECTION), projectData);
+    const cleaned = cleanData(project);
+    const docRef = await addDoc(collection(db, PROJECTS_COLLECTION), cleaned);
 
     await logService.addLog(
       currentUser,
       LogAction.PROJECT_CREATE,
       docRef.id,
-      title,
-      "Nuovo Progetto creato"
+      project.title,
+      project.parentProjectId ? "Nuovo Sotto-Progetto creato" : "Nuovo Progetto creato"
     );
   },
 

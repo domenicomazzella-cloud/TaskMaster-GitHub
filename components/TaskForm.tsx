@@ -3,8 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Task, TaskStatus, TaskPriority, User, Attachment, Project } from '../types';
 import { suggestTagsWithGemini } from '../services/geminiService';
 import { authService } from '../services/authService';
-import { Button, Input, Textarea, Badge, Select } from './UI';
-import { Sparkles, Plus, Users, UserPlus, Paperclip, Image as ImageIcon, Film, FileText, X, Calendar as CalendarIcon, Check, Flag, Hash, Briefcase } from 'lucide-react';
+import { Button, Input, Textarea, Badge } from './UI';
+import { Sparkles, Plus, Users, UserPlus, Paperclip, Film, FileText, X, Calendar as CalendarIcon, Hash, Briefcase, LayoutGrid } from 'lucide-react';
 
 interface TaskFormProps {
   initialTask?: Task | null;
@@ -23,7 +23,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
   const [priority, setPriority] = useState<TaskPriority>(initialTask?.priority || TaskPriority.MEDIUM);
   const [dueDate, setDueDate] = useState(initialTask?.dueDate || '');
   const [attachments, setAttachments] = useState<Attachment[]>(initialTask?.attachments || []);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(initialTask?.projectId || '');
+  
+  // Multi-Project State
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(
+    initialTask?.projectIds || (initialTask?.projectId ? [initialTask.projectId] : [])
+  );
   
   const [tagInput, setTagInput] = useState('');
   const [isGeneratingTags, setIsGeneratingTags] = useState(false);
@@ -146,7 +150,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
       for (let i = 0; i < e.target.files.length; i++) {
         const file = e.target.files[i];
         
-        // Strict Size Limit for Firestore (Base64)
         if (file.size > 300 * 1024) {
           alert(`Il file "${file.name}" è troppo grande (>300KB). Firestore ha limiti severi. Usa file piccoli.`);
           continue;
@@ -162,7 +165,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
         if (file.type.startsWith('image/')) type = 'IMAGE';
         else if (file.type.startsWith('video/')) type = 'VIDEO';
 
-        // Polyfill per randomUUID se necessario
         const uuid = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
 
         newAttachments.push({
@@ -174,7 +176,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
         });
       }
       
-      // Calcolo dimensione totale approssimativa
       const currentSize = attachments.reduce((acc, curr) => acc + curr.size, 0);
       const newSize = newAttachments.reduce((acc, curr) => acc + curr.size, 0);
       
@@ -191,9 +192,26 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
     setAttachments(prev => prev.filter(a => a.id !== id));
   };
 
+  const handleProjectToggle = (projectId: string) => {
+    if (projectId === '') {
+        // Nessun progetto
+        setSelectedProjectIds([]);
+        return;
+    }
+    if (selectedProjectIds.includes(projectId)) {
+        setSelectedProjectIds(prev => prev.filter(id => id !== projectId));
+    } else {
+        setSelectedProjectIds(prev => [...prev, projectId]);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+
+    // Prevenzione doppio invio
+    const submitBtn = e.currentTarget.querySelector('button[type="submit"]') as HTMLButtonElement;
+    if(submitBtn) submitBtn.disabled = true;
 
     const taskData = {
       title,
@@ -205,7 +223,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
       attachments,
       ownerId: initialTask ? initialTask.ownerId : currentUser.id,
       sharedWith: sharedWithIds,
-      projectId: selectedProjectId || undefined
+      projectIds: selectedProjectIds,
+      projectId: undefined // Ensure legacy field is cleared
     };
 
     if (isEdit && initialTask) {
@@ -236,12 +255,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
     [TaskPriority.HIGH]: { label: 'Alta', color: 'bg-red-50 text-red-700 border-red-200' },
   };
 
-  // Project options for select
-  const projectOptions = [
-    { value: '', label: 'Nessun Progetto' },
-    ...projects.map(p => ({ value: p.id, label: p.title }))
-  ];
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
@@ -262,14 +275,45 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, currentUser, ex
           rows={3}
         />
         
-        {/* Project Selector */}
-        <Select 
-          label="Collega al Progetto (Task Madre)"
-          options={projectOptions}
-          value={selectedProjectId}
-          onChange={(e) => setSelectedProjectId(e.target.value)}
-          icon={Briefcase}
-        />
+        {/* Multi-Project Selector */}
+        <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                <Briefcase className="w-4 h-4" /> Progetti (Task Madre)
+            </label>
+            <div className="flex flex-wrap gap-2 mb-2">
+                {selectedProjectIds.length === 0 && (
+                    <span className="text-xs text-slate-400 italic">Nessun progetto selezionato</span>
+                )}
+                {selectedProjectIds.map(pid => {
+                    const proj = projects.find(p => p.id === pid);
+                    return (
+                        <Badge key={pid} color="indigo" onRemove={() => handleProjectToggle(pid)}>
+                            {proj?.title || 'Progetto Sconosciuto'}
+                        </Badge>
+                    );
+                })}
+            </div>
+            
+            <select 
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm"
+                onChange={(e) => {
+                    if (e.target.value) {
+                        handleProjectToggle(e.target.value);
+                        e.target.value = ''; // Reset select
+                    }
+                }}
+                value=""
+            >
+                <option value="" disabled>Aggiungi a un progetto...</option>
+                {projects
+                    .filter(p => !selectedProjectIds.includes(p.id))
+                    .map(p => (
+                    <option key={p.id} value={p.id}>
+                        {p.title}
+                    </option>
+                ))}
+            </select>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

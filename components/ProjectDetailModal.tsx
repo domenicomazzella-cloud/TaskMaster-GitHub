@@ -2,27 +2,31 @@
 import React, { useState, useEffect } from 'react';
 import { Project, Task, TaskStatus } from '../types';
 import { Button, Input, Textarea, Badge } from './UI';
-import { X, CheckCircle2, Circle, ArrowRightCircle, Plus, Trash2, Save, LayoutGrid, Unlink, Edit } from 'lucide-react';
+import { X, CheckCircle2, Circle, ArrowRightCircle, Plus, Trash2, Save, LayoutGrid, Unlink, Edit, FolderPlus, Folder } from 'lucide-react';
 import { dataService } from '../services/dataService';
 
 interface ProjectDetailModalProps {
   project: Project;
-  tasks: Task[]; // Tutti i task (li filtriamo qui o passiamo già filtrati)
+  allProjects: Project[]; // Passiamo tutti i progetti per cercare i sotto-progetti
+  tasks: Task[]; 
   currentUser: any;
   onClose: () => void;
   onUpdateProject: (id: string, data: Partial<Project>) => void;
   onCreateTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
   onEditTask: (task: Task) => void;
+  onOpenSubProject: (project: Project) => void; // Per navigare
 }
 
 export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({ 
   project, 
+  allProjects = [],
   tasks, 
   currentUser,
   onClose, 
   onUpdateProject, 
   onCreateTask,
-  onEditTask 
+  onEditTask,
+  onOpenSubProject
 }) => {
   // Stati per la modifica anagrafica
   const [isEditing, setIsEditing] = useState(false);
@@ -33,8 +37,18 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
 
-  // Filtra i task di questo progetto
-  const projectTasks = tasks.filter(t => t.projectId === project.id);
+  // Stato per nuovo sotto-progetto
+  const [isAddingSubProject, setIsAddingSubProject] = useState(false);
+  const [newSubProjectTitle, setNewSubProjectTitle] = useState('');
+
+  // Filtra i task di questo progetto (supporto multi-project array)
+  const projectTasks = tasks.filter(t => 
+    (t.projectIds && t.projectIds.includes(project.id)) || 
+    t.projectId === project.id // fallback legacy
+  );
+
+  // Filtra i sotto-progetti
+  const subProjects = allProjects.filter(p => p.parentProjectId === project.id);
   
   // Calcolo statistiche
   const total = projectTasks.length;
@@ -56,21 +70,39 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
       tags: [],
       status: TaskStatus.TODO,
       priority: undefined,
-      ownerId: currentUser.id, // Sarà sovrascritto dal service ma utile per il tipo
+      ownerId: currentUser.id,
       sharedWith: [],
       attachments: [],
-      projectId: project.id // FONDAMENTALE: Collega automaticamente al progetto
+      projectIds: [project.id] // Collega a QUESTO progetto
     });
 
     setNewTaskTitle('');
     setIsAddingTask(false);
   };
 
-  const handleUnlinkTask = async (taskId: string, taskTitle: string) => {
-    if(confirm("Scollegare questo task dal progetto? (Il task non verrà eliminato)")) {
+  const handleAddSubProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubProjectTitle.trim()) return;
+    
+    try {
+        await dataService.createProject({
+            title: newSubProjectTitle,
+            parentProjectId: project.id // Gerarchia
+        }, currentUser);
+        setNewSubProjectTitle('');
+        setIsAddingSubProject(false);
+    } catch (e) {
+        console.error(e);
+    }
+  };
+
+  const handleUnlinkTask = async (taskId: string, taskTitle: string, currentProjectIds: string[] = []) => {
+    if(confirm("Scollegare questo task da questo progetto? (Il task rimarrà in altri progetti se assegnato)")) {
         try {
-            // Aggiorna il task rimuovendo il projectId
-            await dataService.updateTask(taskId, { projectId: undefined } as any, currentUser, taskTitle);
+            // Rimuovi questo ID progetto dall'array
+            const newProjectIds = currentProjectIds.filter(id => id !== project.id);
+            
+            await dataService.updateTask(taskId, { projectIds: newProjectIds } as any, currentUser, taskTitle);
         } catch (e) {
             console.error(e);
         }
@@ -92,7 +124,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
         {/* Modal Panel */}
-        <div className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl w-full">
+        <div className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-5xl w-full">
           
           {/* Header */}
           <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-start">
@@ -101,7 +133,9 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                    <LayoutGrid className="w-6 h-6 text-indigo-600" />
                 </div>
                 <div className="w-full">
-                   <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Dashboard Progetto</h2>
+                   <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                       Dashboard Progetto {project.parentProjectId && <span className="text-indigo-400">(Sotto-progetto)</span>}
+                   </h2>
                    {!isEditing ? (
                       <div 
                         className="group flex items-center gap-2 cursor-pointer" 
@@ -131,7 +165,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
              </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 h-[600px]">
+          <div className="grid grid-cols-1 md:grid-cols-3 h-[650px]">
              
              {/* Left: Info & Stats */}
              <div className="p-6 bg-slate-50/50 border-r border-slate-100 md:col-span-1 space-y-6 overflow-y-auto">
@@ -147,7 +181,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                 </div>
 
                 <div>
-                   <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Avanzamento</label>
+                   <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Avanzamento Task</label>
                    <div className="flex items-end gap-2 mb-2">
                       <span className="text-3xl font-bold text-indigo-600">{progress}%</span>
                       <span className="text-sm text-slate-500 mb-1">completato</span>
@@ -165,22 +199,37 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                 </div>
 
                 <div className="pt-6 border-t border-slate-200">
-                   <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Stato Progetto</label>
-                   <Badge 
-                      color={project.status === 'COMPLETED' ? 'green' : project.status === 'ARCHIVED' ? 'slate' : 'indigo'}
-                      className="px-3 py-1 text-sm"
-                   >
-                      {project.status === 'ACTIVE' ? 'IN CORSO' : project.status}
-                   </Badge>
-                   {project.status === 'ACTIVE' && progress === 100 && (
-                      <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
-                         <CheckCircle2 className="w-3 h-3" /> Pronto per essere completato!
-                      </p>
-                   )}
-                   {project.status === 'ACTIVE' && progress < 100 && (
-                      <p className="text-xs text-amber-600 mt-2">
-                         Completa tutti i task per chiudere il progetto.
-                      </p>
+                   <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Sotto-Progetti</label>
+                   <div className="space-y-2 mb-3">
+                       {subProjects.length === 0 && <p className="text-xs text-slate-400 italic">Nessun sotto-progetto.</p>}
+                       {subProjects.map(sp => (
+                           <div 
+                             key={sp.id} 
+                             className="flex items-center gap-2 p-2 bg-white border border-slate-200 rounded cursor-pointer hover:border-indigo-300"
+                             onClick={() => onOpenSubProject(sp)}
+                           >
+                               <Folder className="w-4 h-4 text-indigo-400" />
+                               <span className="text-sm text-slate-700 truncate">{sp.title}</span>
+                           </div>
+                       ))}
+                   </div>
+                   
+                   {!isAddingSubProject ? (
+                        <Button variant="secondary" size="sm" className="w-full text-xs" icon={FolderPlus} onClick={() => setIsAddingSubProject(true)}>
+                            Nuovo Sotto-Progetto
+                        </Button>
+                   ) : (
+                       <form onSubmit={handleAddSubProject} className="flex gap-1">
+                           <Input 
+                             value={newSubProjectTitle} 
+                             onChange={e => setNewSubProjectTitle(e.target.value)} 
+                             placeholder="Nome..." 
+                             className="text-xs h-8"
+                             autoFocus
+                           />
+                           <Button type="submit" size="sm" className="h-8 px-2"><CheckCircle2 className="w-4 h-4"/></Button>
+                           <Button type="button" size="sm" variant="ghost" className="h-8 px-2" onClick={() => setIsAddingSubProject(false)}><X className="w-4 h-4"/></Button>
+                       </form>
                    )}
                 </div>
              </div>
@@ -230,6 +279,10 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                                   <div className="flex gap-2 text-[10px] text-slate-400">
                                      <span>{task.ownerUsername}</span>
                                      {task.dueDate && <span>• Scade: {new Date(task.dueDate).toLocaleDateString()}</span>}
+                                     {/* Show other projects if multiple */}
+                                     {task.projectIds && task.projectIds.length > 1 && (
+                                         <span className="text-indigo-400">• +{task.projectIds.length - 1} altri progetti</span>
+                                     )}
                                   </div>
                                </div>
                             </div>
@@ -239,7 +292,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                                title="Scollega dal progetto"
                                onClick={(e) => {
                                  e.stopPropagation(); // Stop propagation to prevent opening edit modal
-                                 handleUnlinkTask(task.id, task.title);
+                                 handleUnlinkTask(task.id, task.title, task.projectIds);
                                }}
                             >
                                <Unlink className="w-4 h-4" />

@@ -4,7 +4,7 @@ import { Project, Task, User } from '../types';
 import { ProjectCard } from './ProjectCard';
 import { ProjectDetailModal } from './ProjectDetailModal';
 import { Button, Input, Textarea } from './UI';
-import { Plus, LayoutGrid } from 'lucide-react';
+import { Plus, LayoutGrid, CornerDownRight } from 'lucide-react';
 import { dataService } from '../services/dataService';
 
 interface ProjectListProps {
@@ -12,7 +12,7 @@ interface ProjectListProps {
   tasks: Task[];
   currentUser: User;
   onCreateTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
-  onEditTask: (task: Task) => void; // Nuova prop per modifica task
+  onEditTask: (task: Task) => void; 
 }
 
 export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, currentUser, onCreateTask, onEditTask }) => {
@@ -27,7 +27,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, curre
     e.preventDefault();
     if (!title.trim()) return;
     try {
-      await dataService.createProject(title, desc, currentUser);
+      await dataService.createProject({ title, description: desc }, currentUser);
       setIsCreating(false);
       setTitle('');
       setDesc('');
@@ -51,18 +51,17 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, curre
   };
 
   const handleUpdateDetails = async (id: string, updates: Partial<Project>) => {
-    // Trova il titolo corrente per il log se non stiamo cambiando il titolo stesso
     const currentTitle = projects.find(p => p.id === id)?.title || "Progetto";
     await dataService.updateProject(id, updates, currentUser, updates.title || currentTitle);
     
-    // Aggiorna lo stato locale del modale se aperto
     if (selectedProject && selectedProject.id === id) {
        setSelectedProject(prev => prev ? ({ ...prev, ...updates }) : null);
     }
   };
 
   // Sort projects: Active first, then Completed, then Archived
-  const sortedProjects = [...projects].sort((a, b) => {
+  // Only show top-level projects in the main list (parentProjectId is null)
+  const rootProjects = projects.filter(p => !p.parentProjectId).sort((a, b) => {
     const order = { ACTIVE: 0, COMPLETED: 1, ARCHIVED: 2 };
     return (order[a.status] || 0) - (order[b.status] || 0);
   });
@@ -110,35 +109,48 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, curre
         </div>
       )}
 
-      {projects.length === 0 && !isCreating ? (
+      {rootProjects.length === 0 && !isCreating ? (
         <div className="text-center py-20 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-          <p className="text-slate-500">Non hai ancora creato nessun progetto.</p>
+          <p className="text-slate-500">Non hai ancora creato nessun progetto principale.</p>
           <Button variant="ghost" onClick={() => setIsCreating(true)} className="mt-2 text-indigo-600">Inizia ora</Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedProjects.map(proj => (
-            <ProjectCard 
-              key={proj.id} 
-              project={proj} 
-              tasks={tasks}
-              onDelete={() => handleDelete(proj.id, proj.title)}
-              onUpdateStatus={(id, s) => handleUpdateStatus(id, s, proj.title)}
-              onClick={(p) => setSelectedProject(p)}
-            />
-          ))}
+          {rootProjects.map(proj => {
+             // Conta sotto-progetti
+             const subCount = projects.filter(p => p.parentProjectId === proj.id).length;
+             return (
+                <div key={proj.id} className="relative">
+                    <ProjectCard 
+                    project={proj} 
+                    tasks={tasks} // La card calcolerà i task corretti
+                    onDelete={() => handleDelete(proj.id, proj.title)}
+                    onUpdateStatus={(id, s) => handleUpdateStatus(id, s, proj.title)}
+                    onClick={(p) => setSelectedProject(p)}
+                    />
+                    {subCount > 0 && (
+                        <div className="absolute -bottom-2 right-4 bg-white border border-slate-200 text-[10px] px-2 py-0.5 rounded-full shadow-sm text-slate-500 flex items-center gap-1">
+                            <CornerDownRight className="w-3 h-3" />
+                            {subCount} Sotto-progetti
+                        </div>
+                    )}
+                </div>
+             );
+          })}
         </div>
       )}
 
       {selectedProject && (
         <ProjectDetailModal 
            project={selectedProject}
+           allProjects={projects} // Passa tutti per trovare sotto-progetti
            tasks={tasks}
            currentUser={currentUser}
            onClose={() => setSelectedProject(null)}
            onUpdateProject={handleUpdateDetails}
            onCreateTask={onCreateTask}
-           onEditTask={onEditTask} // Passato
+           onEditTask={onEditTask} 
+           onOpenSubProject={(sub) => setSelectedProject(sub)} // Navigazione
         />
       )}
     </div>

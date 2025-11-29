@@ -20,18 +20,18 @@ const App: React.FC = () => {
   // --- Auth State ---
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [allUsers, setAllUsers] = useState<User[]>([]); // Cache utenti per filtri admin
+  const [allUsers, setAllUsers] = useState<User[]>([]); 
 
   // --- Task & Project State ---
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const prevTasksRef = useRef<Task[]>([]); // Per rilevare nuovi task
+  const prevTasksRef = useRef<Task[]>([]); 
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [viewingTask, setViewingTask] = useState<Task | null>(null); // Per la modale di dettaglio
-  const [showLogs, setShowLogs] = useState(false); // Per il registro attività
-  const [showPwdModal, setShowPwdModal] = useState(false); // Per cambio password
+  const [viewingTask, setViewingTask] = useState<Task | null>(null); 
+  const [showLogs, setShowLogs] = useState(false); 
+  const [showPwdModal, setShowPwdModal] = useState(false); 
   const [newPassword, setNewPassword] = useState('');
   
   // Navigation & Views
@@ -42,11 +42,10 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'ALL'>('ALL');
-  // Aggiunto SHARED_BY_ME
   const [viewFilter, setViewFilter] = useState<'ALL' | 'MINE' | 'SHARED' | 'SHARED_BY_ME' | 'TEAM' | 'UNASSIGNED'>('ALL');
   
   // Admin Specific Filter
-  const [leaderFilter, setLeaderFilter] = useState<string>(''); // ID del leader selezionato
+  const [leaderFilter, setLeaderFilter] = useState<string>(''); 
 
   // Notification State
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
@@ -68,18 +67,14 @@ const App: React.FC = () => {
       if (currentUser) {
         setActiveTab('TASKS');
         
-        // Carica tutti gli utenti se necessario (per Admin o Manager)
         const usersList = await authService.getAllUsers();
         setAllUsers(usersList);
 
-        // Se l'utente è un Manager/Leader, recupera i membri di TUTTI i team che gestisce
         if (currentUser.role === UserRole.MANAGER || (currentUser.teamRoles && Object.values(currentUser.teamRoles).includes(UserRole.MANAGER))) {
-           // Trova gli ID dei team dove l'utente è LEADER (MANAGER)
            const managedTeamIds = currentUser.teamIds?.filter(tid => 
-             currentUser.teamRoles?.[tid] === UserRole.MANAGER || currentUser.role === UserRole.MANAGER // Fallback global role
+             currentUser.teamRoles?.[tid] === UserRole.MANAGER || currentUser.role === UserRole.MANAGER 
            ) || [];
            
-           // Trova tutti gli utenti che appartengono a questi team
            const members = usersList.filter(u => 
              u.teamIds?.some(tid => managedTeamIds.includes(tid))
            ).map(u => u.id);
@@ -138,11 +133,8 @@ const App: React.FC = () => {
     if (notificationService.getPermissionState() !== 'granted') return;
 
     currentTasks.forEach(task => {
-      // 1. Check for NEW shared tasks
       if (task.ownerId !== currentUser.id && task.sharedWith.includes(currentUser.id)) {
         const prevTask = prevTasks.find(t => t.id === task.id);
-        
-        // La notifica parte SOLO se il task NON era condiviso con me nello stato precedente
         const wasSharedWithMe = prevTask ? prevTask.sharedWith.includes(currentUser.id) : false;
 
         if (!wasSharedWithMe) {
@@ -154,7 +146,6 @@ const App: React.FC = () => {
         }
       }
 
-      // 2. Check for Deadlines
       if (task.dueDate && task.status !== TaskStatus.DONE) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -219,7 +210,7 @@ const App: React.FC = () => {
         ownerId: user.id,
         ownerUsername: user.username,
         sharedWith: taskData.sharedWith || []
-      }, user); // Pass user for logging
+      }, user); 
       setIsModalOpen(false);
     } catch (e: any) {
       alert("Errore salvataggio task: " + e.message);
@@ -232,7 +223,7 @@ const App: React.FC = () => {
     notificationService.resetNotificationState(`deadline_${id}`);
     
     try {
-      await dataService.updateTask(id, data, user, updatedTask.title); // Pass user for logging
+      await dataService.updateTask(id, data, user, updatedTask.title); 
       setEditingTask(null);
       setIsModalOpen(false);
     } catch (e: any) {
@@ -243,7 +234,7 @@ const App: React.FC = () => {
   const handleStatusChange = async (task: Task, newStatus: TaskStatus) => {
      if (!user) return;
      try {
-       await dataService.updateTask(task.id, { status: newStatus }, user, task.title); // Pass user for logging
+       await dataService.updateTask(task.id, { status: newStatus }, user, task.title); 
      } catch (e) {
        console.error("Status update failed", e);
      }
@@ -253,7 +244,7 @@ const App: React.FC = () => {
     if (!user) return;
     const taskToDelete = tasks.find(t => t.id === id);
     if (confirm('Sei sicuro di voler eliminare questo task?')) {
-      await dataService.deleteTask(id, user, taskToDelete?.title || 'Sconosciuto'); // Pass user for logging
+      await dataService.deleteTask(id, user, taskToDelete?.title || 'Sconosciuto'); 
       if (viewingTask?.id === id) setViewingTask(null);
     }
   };
@@ -300,20 +291,18 @@ const App: React.FC = () => {
       return tasks;
     }
     
-    // Se è Manager (globale) o ha ruoli di leadership nei team
     const isManager = user.role === UserRole.MANAGER || 
                       (user.teamRoles && Object.values(user.teamRoles).includes(UserRole.MANAGER));
 
     if (isManager) {
       return tasks.filter(t => 
-        !t.ownerId || // Mostra i task senza proprietario (Non Assegnati) ai Manager
+        !t.ownerId || 
         t.ownerId === user.id || 
         t.sharedWith.includes(user.id) ||
-        teamMembers.includes(t.ownerId) // Include i task dei membri dei team gestiti
+        teamMembers.includes(t.ownerId) 
       );
     }
     
-    // Utente base
     return tasks.filter(t => 
       t.ownerId === user.id || t.sharedWith.includes(user.id)
     );
@@ -335,33 +324,26 @@ const App: React.FC = () => {
     return visibleTasks.filter(task => {
       // 1. Filtri di Ruolo/View
       if (viewFilter === 'MINE' && task.ownerId !== user.id) return false;
-      // SHARED = Condivisi CON me (non creati da me)
       if (viewFilter === 'SHARED' && (task.ownerId === user.id || !task.sharedWith.includes(user.id))) return false;
-      // SHARED_BY_ME = Creati da me e condivisi con altri
       if (viewFilter === 'SHARED_BY_ME' && (task.ownerId !== user.id || task.sharedWith.length === 0)) return false;
       
-      if (viewFilter === 'UNASSIGNED' && task.ownerId) return false; // Filtra solo task SENZA ownerId
+      if (viewFilter === 'UNASSIGNED' && task.ownerId) return false; 
       
       if (viewFilter === 'TEAM') {
-         // Se filtro per Team, mostro solo i task dei membri (non i miei personali se non in contesto team)
          if (!teamMembers.includes(task.ownerId) || task.ownerId === user.id) return false;
       }
 
       // 2. Filtro Admin per Leader
       if (user.role === UserRole.ADMIN && leaderFilter) {
-         // Trova il leader selezionato
          const leaderUser = allUsers.find(u => u.id === leaderFilter);
          if (leaderUser) {
-           // Trova i team dove è leader
            const managedTeamIds = leaderUser.teamIds?.filter(tid => 
              leaderUser.teamRoles?.[tid] === UserRole.MANAGER || leaderUser.role === UserRole.MANAGER
            ) || [];
-           // Trova i membri di quei team
            const membersIds = allUsers.filter(u => 
              u.teamIds?.some(tid => managedTeamIds.includes(tid))
            ).map(u => u.id);
 
-           // Il task deve appartenere al Leader O ai suoi membri
            if (task.ownerId !== leaderUser.id && !membersIds.includes(task.ownerId)) return false;
          }
       }
@@ -398,10 +380,7 @@ const App: React.FC = () => {
     return <Auth />;
   }
 
-  // --- Render ---
-  
   if (user.role !== UserRole.ADMIN && activeTab === 'ADMIN') {
-    // Safety check for UI visibility
     setActiveTab('TASKS');
   }
 
@@ -454,8 +433,6 @@ const App: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">
-              
-              {/* ACTIVITY LOG BUTTON */}
               <Button 
                 variant="ghost" 
                 onClick={() => setShowLogs(true)}
@@ -533,10 +510,11 @@ const App: React.FC = () => {
             tasks={tasks}
             currentUser={user}
             onCreateTask={handleCreateTask}
-            onEditTask={handleEditClick} // Passata la funzione di modifica
+            onEditTask={handleEditClick} 
           />
         ) : (
           <>
+            {/* Stats Cards ... */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
                 <p className="text-xs font-medium text-slate-500 uppercase">Totale Visibili</p>
@@ -556,9 +534,10 @@ const App: React.FC = () => {
               </div>
             </div>
 
+            {/* Filters Bar ... */}
             <div className="flex flex-col space-y-4 mb-6">
               <div className="flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between">
-                
+                {/* View Mode Toggle */}
                 <div className="flex p-1 bg-slate-200 rounded-lg shrink-0">
                    <button onClick={() => setViewMode('LIST')} className={`p-2 rounded-md transition-all ${viewMode === 'LIST' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`} title="Lista">
                      <List className="w-4 h-4" />
@@ -568,6 +547,7 @@ const App: React.FC = () => {
                    </button>
                 </div>
 
+                {/* Filter Buttons */}
                 <div className="flex p-1 bg-slate-200 rounded-lg overflow-x-auto max-w-full">
                   <button onClick={() => setViewFilter('ALL')} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all whitespace-nowrap ${viewFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Tutti</button>
                   <button onClick={() => setViewFilter('MINE')} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all whitespace-nowrap ${viewFilter === 'MINE' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>I miei</button>
@@ -591,7 +571,6 @@ const App: React.FC = () => {
                   <input type="text" placeholder="Cerca task o allegati..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white" />
                 </div>
                 
-                {/* Admin Only: Filter by Leader */}
                 {user.role === UserRole.ADMIN && (
                    <div className="w-full xl:w-56 shrink-0">
                      <Select 
@@ -615,6 +594,7 @@ const App: React.FC = () => {
 
               {(availableTags.length > 0 || selectedTags.length > 0) && (
                 <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm space-y-3">
+                  {/* Tag Filtering UI ... */}
                   {selectedTags.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-slate-100">
                       <span className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1.5 mr-1">
@@ -644,14 +624,17 @@ const App: React.FC = () => {
               filteredTasks.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredTasks.map(task => {
-                    // Trova il progetto associato
-                    const project = projects.find(p => p.id === task.projectId);
+                    // Mappa gli ID dei progetti ai loro nomi
+                    const projectNames = task.projectIds
+                      ? task.projectIds.map(pid => projects.find(p => p.id === pid)?.title).filter(Boolean) as string[]
+                      : (task.projectId ? [projects.find(p => p.id === task.projectId)?.title].filter(Boolean) as string[] : []);
+
                     return (
                       <TaskCard 
                         key={task.id} 
                         task={task} 
                         currentUserId={user.id}
-                        projectName={project?.title} // Passa il nome del progetto
+                        projectNames={projectNames} // Passa lista nomi progetti
                         onEdit={handleEditClick}
                         onDelete={handleDeleteTask}
                         onTagClick={addTagFilter}
@@ -663,6 +646,7 @@ const App: React.FC = () => {
                 </div>
               ) : (
                 <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
+                  {/* Empty State ... */}
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-50 mb-4">
                     <List className="w-8 h-8 text-slate-300" />
                   </div>
@@ -693,6 +677,7 @@ const App: React.FC = () => {
         )}
       </main>
 
+      {/* Modals ... */}
       {activeTab === 'TASKS' && (
         <button 
           onClick={() => { setEditingTask(null); setIsModalOpen(true); }}

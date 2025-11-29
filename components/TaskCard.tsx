@@ -7,7 +7,7 @@ import { CheckCircle2, Circle, ArrowRightCircle, Trash2, Edit, Users, Paperclip,
 interface TaskCardProps {
   task: Task;
   currentUserId: string;
-  projectName?: string; // Nuova prop per il nome del progetto
+  projectNames?: string[]; // Array of project names
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
   onTagClick: (tag: string) => void;
@@ -15,11 +15,11 @@ interface TaskCardProps {
   onClick?: (task: Task) => void;
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, projectName, onEdit, onDelete, onTagClick, handleStatusChange, onClick }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, projectNames = [], onEdit, onDelete, onTagClick, handleStatusChange, onClick }) => {
   const isOwner = task.ownerId === currentUserId;
   const attachments = task.attachments || [];
   const [isAnimating, setIsAnimating] = React.useState(false);
-  const priority = task.priority || TaskPriority.MEDIUM; // Default fallback
+  const priority = task.priority || TaskPriority.MEDIUM; 
 
   const statusIcon = {
     [TaskStatus.TODO]: <Circle className="w-5 h-5 text-slate-400" />,
@@ -33,7 +33,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, project
     [TaskStatus.DONE]: "COMPLETATO",
   };
 
-  // Configurazione del tema basata sulla Priorità
   const priorityTheme = {
     [TaskPriority.HIGH]: { 
       bg: 'bg-red-50/80', 
@@ -63,7 +62,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, project
 
   const theme = priorityTheme[priority];
 
-  // Sovrascrittura per stato completato (meno enfasi)
   const isDone = task.status === TaskStatus.DONE;
   const finalBg = isDone ? 'bg-slate-50/50 opacity-80' : theme.bg;
   const finalBorder = isDone ? 'border-l-slate-300' : theme.borderLeft;
@@ -86,26 +84,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, project
 
   const getTagIcon = (tag: string) => {
     const lower = tag.toLowerCase();
-    
-    if (lower.includes('bug') || lower.includes('errore') || lower.includes('fix')) return '🐞';
-    if (lower.includes('feature') || lower.includes('novità') || lower.includes('feat')) return '✨';
-    if (lower.includes('dev') || lower.includes('code') || lower.includes('frontend') || lower.includes('backend')) return '💻';
-    if (lower.includes('design') || lower.includes('ui') || lower.includes('ux')) return '🎨';
-    if (lower.includes('mobile') || lower.includes('app')) return '📱';
-    
-    if (lower.includes('urgente') || lower.includes('high')) return '🔥';
-    if (lower.includes('lavoro') || lower.includes('work')) return '💼';
-    if (lower.includes('riunione') || lower.includes('meeting')) return '📅';
-    if (lower.includes('progetto')) return '🚀';
-    
-    if (lower.includes('casa')) return '🏠';
-    if (lower.includes('spesa')) return '🛒';
-    if (lower.includes('soldi')) return '💰';
-    if (lower.includes('studio')) return '📚';
-    if (lower.includes('idea')) return '💡';
-    if (lower.includes('salute')) return '🩺';
-    if (lower.includes('viaggio')) return '✈️';
-
+    if (lower.includes('bug')) return '🐞';
+    if (lower.includes('feature')) return '✨';
+    if (lower.includes('urgente')) return '🔥';
     return '🏷️';
   };
 
@@ -162,7 +143,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, project
             </span>
           </button>
           
-          {/* Priority Badge */}
           {priority && (
             <div 
               className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold border transition-colors ${
@@ -170,7 +150,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, project
                   ? 'bg-slate-100 text-slate-400 border-slate-200' 
                   : `${theme.badgeBg} ${theme.flagColor} ${theme.badgeBorder}`
               }`} 
-              title={`Priorità ${priority}`}
             >
               <Flag className={`w-3 h-3 ${isDone ? 'text-slate-400' : 'fill-current'}`} />
               <span className="uppercase tracking-wider hidden sm:inline-block">
@@ -200,13 +179,15 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, project
         </div>
       </div>
 
-      {/* Project Badge */}
-      {projectName && (
-        <div className="mb-2">
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100/50">
-            <LayoutGrid className="w-3 h-3" />
-            {projectName}
-          </span>
+      {/* Project Badges (Multiple) */}
+      {projectNames && projectNames.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1">
+          {projectNames.map((name, idx) => (
+            <span key={idx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100/50">
+              <LayoutGrid className="w-3 h-3" />
+              {name}
+            </span>
+          ))}
         </div>
       )}
 

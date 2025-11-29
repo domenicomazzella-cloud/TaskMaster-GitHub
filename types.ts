@@ -47,7 +47,17 @@ export interface Project {
   ownerId: string;
   createdAt: string;
   // Status aggiornato
-  status: 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'; 
+  status: 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
+  
+  // New fields for Project-as-Task parity
+  sharedWith?: string[];
+  teamIds?: string[];
+  responsibleIds?: string[]; // Leaders
+  priority?: TaskPriority;
+  dueDate?: string;
+
+  // Hierarchy
+  parentProjectId?: string; // ID del progetto padre (se questo è un sotto-progetto)
 }
 
 export interface Attachment {
@@ -72,8 +82,12 @@ export interface Task {
   sharedWith: string[]; 
   attachments?: Attachment[];
   
-  // Link to Project
-  projectId?: string;
+  // Multi-Project Support
+  projectIds?: string[]; // Array di ID dei progetti a cui appartiene
+  projectId?: string; // DEPRECATO (Mantenuto per retrocompatibilità in lettura)
+  
+  // Dependencies
+  dependencyIds?: string[]; // Task che devono essere completati prima di questo
 }
 
 export interface TagSuggestionRequest {
