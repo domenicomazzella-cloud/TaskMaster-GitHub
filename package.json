@@ -12,7 +12,7 @@
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "lucide-react": "^0.292.0",
-    "@googlemaps/google-maps-services-js": "^0.6.12",  // Modifica la versione
+    "@googlemaps/google-maps-services-js": "^0.6.12",
     "firebase": "9.10.7"
 }
 
