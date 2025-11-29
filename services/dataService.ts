@@ -16,6 +16,17 @@ import { logService } from './logService';
 const TASKS_COLLECTION = 'tasks';
 const PROJECTS_COLLECTION = 'projects';
 
+// Utility per rimuovere campi undefined (Firestore non li accetta)
+const cleanData = (data: any) => {
+  const cleaned = { ...data };
+  Object.keys(cleaned).forEach(key => {
+    if (cleaned[key] === undefined) {
+      delete cleaned[key];
+    }
+  });
+  return cleaned;
+};
+
 export const dataService = {
   // Ascolta i task in tempo reale
   subscribeToTasks: (callback: (tasks: Task[]) => void) => {
@@ -31,10 +42,14 @@ export const dataService = {
   },
 
   createTask: async (task: Omit<Task, 'id' | 'createdAt'>, currentUser: User) => {
-    const taskData = {
+    const rawData = {
       ...task,
       createdAt: new Date().toISOString()
     };
+    
+    // RIMUOVE I CAMPI UNDEFINED (es. projectId se non selezionato)
+    const taskData = cleanData(rawData);
+
     const docRef = await addDoc(collection(db, TASKS_COLLECTION), taskData);
     
     // Log
@@ -49,7 +64,11 @@ export const dataService = {
 
   updateTask: async (taskId: string, updates: Partial<Task>, currentUser: User, originalTaskTitle?: string) => {
     const docRef = doc(db, TASKS_COLLECTION, taskId);
-    await updateDoc(docRef, updates);
+    
+    // RIMUOVE I CAMPI UNDEFINED
+    const updatesCleaned = cleanData(updates);
+
+    await updateDoc(docRef, updatesCleaned);
 
     // Determina tipo di log
     const title = updates.title || originalTaskTitle || "Task sconosciuto";
@@ -105,7 +124,9 @@ export const dataService = {
       createdAt: new Date().toISOString(),
       status: 'ACTIVE'
     };
-    const docRef = await addDoc(collection(db, PROJECTS_COLLECTION), project);
+    
+    const projectData = cleanData(project);
+    const docRef = await addDoc(collection(db, PROJECTS_COLLECTION), projectData);
 
     await logService.addLog(
       currentUser,
@@ -118,7 +139,9 @@ export const dataService = {
 
   updateProject: async (projectId: string, updates: Partial<Project>, currentUser: User, originalTitle: string) => {
     const docRef = doc(db, PROJECTS_COLLECTION, projectId);
-    await updateDoc(docRef, updates);
+    
+    const updatesCleaned = cleanData(updates);
+    await updateDoc(docRef, updatesCleaned);
 
     let details = "Progetto aggiornato";
     if (updates.status) details = `Stato progetto: ${updates.status}`;
