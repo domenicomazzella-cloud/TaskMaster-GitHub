@@ -59,6 +59,9 @@ export interface Project {
 
   // Hierarchy
   parentProjectId?: string; // ID del progetto padre (se questo è un sotto-progetto)
+  
+  // Routine Link
+  isRoutineInstance?: boolean; // Flag per identificare progetti generati da routine
 }
 
 export interface Attachment {
@@ -98,6 +101,32 @@ export interface TagSuggestionRequest {
 
 export type ThemeColor = 'blue' | 'green' | 'yellow' | 'red' | 'gray';
 
+// --- ROUTINE & DUTIES ---
+
+export enum RoutineFrequency {
+  ONCE = 'ONCE',
+  DAILY = 'DAILY',
+  WEEKLY = 'WEEKLY',
+  MONTHLY = 'MONTHLY',
+  SEMI_ANNUAL = 'SEMI_ANNUAL'
+}
+
+export interface Duty {
+  id: string;
+  title: string;
+  description?: string;
+  estimatedMinutes?: number;
+}
+
+export interface Routine {
+  id: string;
+  title: string;
+  description?: string;
+  frequency: RoutineFrequency;
+  dutyIds: string[]; // IDs delle mansioni incluse
+  createdAt: string;
+}
+
 // --- LOGGING TYPES ---
 
 export enum LogAction {
@@ -113,7 +142,10 @@ export enum LogAction {
   TEAM_CREATE = 'TEAM_CREATE',
   TEAM_UPDATE = 'TEAM_UPDATE',
   TEAM_DELETE = 'TEAM_DELETE',
-  PASSWORD_CHANGE = 'PASSWORD_CHANGE'
+  PASSWORD_CHANGE = 'PASSWORD_CHANGE',
+  // Routine Actions
+  ROUTINE_CREATE = 'ROUTINE_CREATE',
+  ROUTINE_ASSIGN = 'ROUTINE_ASSIGN'
 }
 
 export interface LogEntry {

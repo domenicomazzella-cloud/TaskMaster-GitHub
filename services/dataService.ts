@@ -10,15 +10,18 @@ import {
   orderBy,
   getDocs,
   where,
-  writeBatch
+  writeBatch,
+  getDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Task, User, LogAction, Project, AppNotification } from '../types';
+import { Task, User, LogAction, Project, AppNotification, Duty, Routine, TaskPriority, TaskStatus } from '../types';
 import { logService } from './logService';
 
 const TASKS_COLLECTION = 'tasks';
 const PROJECTS_COLLECTION = 'projects';
 const NOTIFICATIONS_COLLECTION = 'notifications';
+const DUTIES_COLLECTION = 'duties';
+const ROUTINES_COLLECTION = 'routines';
 
 // Utility per rimuovere campi undefined (Firestore non li accetta)
 const cleanData = (data: any) => {
@@ -150,11 +153,6 @@ export const dataService = {
       title,
       details
     );
-
-    // Notifiche Update: Proprietario + Condivisi (escluso chi ha fatto l'update)
-    // Per semplificare, qui notifichiamo solo se c'è un campo rilevante cambiato (status, commenti, etc)
-    // In una app reale recupereremmo prima il task per avere la lista completa di sharedWith
-    // Qui assumiamo che updates.sharedWith contenga la lista aggiornata o non notifichiamo tutti
   },
 
   deleteTask: async (taskId: string, currentUser: User, taskTitle: string) => {
@@ -193,7 +191,8 @@ export const dataService = {
       teamIds: projectData.teamIds || [],
       responsibleIds: projectData.responsibleIds || [],
       parentProjectId: projectData.parentProjectId || undefined, 
-      priority: projectData.priority || undefined
+      priority: projectData.priority || undefined,
+      isRoutineInstance: projectData.isRoutineInstance || false
     };
     
     const cleaned = cleanData(project);
@@ -219,6 +218,8 @@ export const dataService = {
         `/project/${docRef.id}`
       );
     }
+    
+    return docRef.id;
   },
 
   updateProject: async (projectId: string, updates: Partial<Project>, currentUser: User, originalTitle: string) => {
@@ -248,6 +249,106 @@ export const dataService = {
       projectId,
       originalTitle,
       "Progetto eliminato"
+    );
+  },
+
+  // --- DUTIES (MANSIONI) ---
+
+  getDuties: async (): Promise<Duty[]> => {
+    const q = query(collection(db, DUTIES_COLLECTION), orderBy('title', 'asc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Duty));
+  },
+
+  createDuty: async (duty: Omit<Duty, 'id'>) => {
+    await addDoc(collection(db, DUTIES_COLLECTION), duty);
+  },
+
+  deleteDuty: async (id: string) => {
+    await deleteDoc(doc(db, DUTIES_COLLECTION, id));
+  },
+
+  // --- ROUTINES ---
+
+  getRoutines: async (): Promise<Routine[]> => {
+    const q = query(collection(db, ROUTINES_COLLECTION), orderBy('title', 'asc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Routine));
+  },
+
+  createRoutine: async (routine: Omit<Routine, 'id' | 'createdAt'>, currentUser: User) => {
+    const data = {
+      ...routine,
+      createdAt: new Date().toISOString()
+    };
+    const ref = await addDoc(collection(db, ROUTINES_COLLECTION), data);
+    await logService.addLog(currentUser, LogAction.ROUTINE_CREATE, ref.id, routine.title, "Creata nuova routine");
+  },
+
+  deleteRoutine: async (id: string) => {
+    await deleteDoc(doc(db, ROUTINES_COLLECTION, id));
+  },
+
+  // --- ROUTINE ASSIGNMENT LOGIC ---
+  
+  assignRoutineToUser: async (
+    routineId: string, 
+    userId: string, 
+    date: string, 
+    adminUser: User
+  ): Promise<void> => {
+    // 1. Recupera Routine e Mansioni
+    const routineDoc = await getDoc(doc(db, ROUTINES_COLLECTION, routineId));
+    if (!routineDoc.exists()) throw new Error("Routine non trovata");
+    const routine = routineDoc.data() as Routine;
+
+    const dutyPromises = routine.dutyIds.map(did => getDoc(doc(db, DUTIES_COLLECTION, did)));
+    const dutyDocs = await Promise.all(dutyPromises);
+    const duties = dutyDocs.map(d => d.data() as Duty).filter(d => !!d);
+
+    // 2. Crea Progetto Contenitore (Es. "Routine Pulizia - 2025-10-10")
+    const projectTitle = `Routine: ${routine.title} - ${new Date(date).toLocaleDateString()}`;
+    const projectId = await dataService.createProject({
+      title: projectTitle,
+      description: `Esecuzione routine programmata (${routine.frequency}).\n${routine.description || ''}`,
+      ownerId: adminUser.id, // L'admin possiede il record generato
+      sharedWith: [userId], // Condiviso con l'esecutore
+      responsibleIds: [userId], // L'esecutore è responsabile
+      priority: TaskPriority.MEDIUM,
+      dueDate: date,
+      isRoutineInstance: true
+    }, adminUser);
+
+    // 3. Crea i Task per ogni Mansione
+    const batch = writeBatch(db);
+    
+    duties.forEach(duty => {
+      const taskRef = doc(collection(db, TASKS_COLLECTION));
+      const newTask: any = {
+        title: duty.title,
+        description: duty.description || `Mansione parte della routine ${routine.title}`,
+        status: TaskStatus.TODO,
+        priority: TaskPriority.MEDIUM,
+        ownerId: adminUser.id, // Creato da admin
+        ownerUsername: adminUser.username,
+        sharedWith: [userId], // Visibile all'utente
+        projectIds: [projectId], // Collegato al progetto routine
+        tags: ['Routine', 'Auto-Generated'],
+        createdAt: new Date().toISOString(),
+        dueDate: date
+      };
+      batch.set(taskRef, newTask);
+    });
+
+    await batch.commit();
+
+    // 4. Log e Notifica
+    await logService.addLog(adminUser, LogAction.ROUTINE_ASSIGN, projectId, routine.title, `Assegnata routine a utente ${userId}`);
+    await sendNotifications(
+      [userId], 
+      "Nuova Routine Assegnata", 
+      `Ti è stata assegnata la routine "${routine.title}" per il giorno ${new Date(date).toLocaleDateString()}`,
+      `/project/${projectId}`
     );
   },
 

@@ -2,10 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, Team } from '../types';
 import { authService } from '../services/authService';
-import { Button, Input, Select, Badge, Card } from './UI';
+import { Button, Input, Select, Badge, Card, Autocomplete } from './UI';
 import { TeamManager } from './TeamManager';
+import { RoutineManager } from './RoutineManager'; // Import nuovo
 import { ActivityLog } from './ActivityLog';
-import { UserPlus, Trash2, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Check, Ban, KeyRound, Edit, History, X, Copy, Link as LinkIcon, RotateCcw, Wrench, AlertTriangle } from 'lucide-react';
+import { UserPlus, Trash2, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Check, Ban, KeyRound, Edit, History, X, Copy, Link as LinkIcon, RotateCcw, Wrench, AlertTriangle, ClipboardList } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { logService } from '../services/logService';
 
@@ -44,11 +45,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'DELETED'>('ACTIVE');
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'username', direction: 'asc' });
 
-  const [viewSection, setViewSection] = useState<'USERS' | 'TEAMS' | 'LOGS' | 'MAINTENANCE'>('USERS');
+  // Aggiunto ROUTINES alle sezioni
+  const [viewSection, setViewSection] = useState<'USERS' | 'TEAMS' | 'ROUTINES' | 'LOGS' | 'MAINTENANCE'>('USERS');
 
   useEffect(() => {
     setAppUrl(window.location.origin);
-    if (viewSection !== 'LOGS' && viewSection !== 'MAINTENANCE') {
+    if (viewSection !== 'LOGS' && viewSection !== 'MAINTENANCE' && viewSection !== 'ROUTINES') {
       loadData();
     }
   }, [viewSection]);
@@ -275,6 +277,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
            Gestione Team
          </button>
          <button 
+           onClick={() => setViewSection('ROUTINES')}
+           className={`px-4 py-2 font-medium text-sm rounded-lg transition-colors whitespace-nowrap flex items-center gap-2 ${viewSection === 'ROUTINES' ? 'bg-green-100 text-green-700' : 'text-slate-500 hover:text-slate-700'}`}
+         >
+           <ClipboardList className="w-4 h-4" />
+           Routine & Mansioni
+         </button>
+         <button 
            onClick={() => setViewSection('LOGS')}
            className={`px-4 py-2 font-medium text-sm rounded-lg transition-colors whitespace-nowrap flex items-center gap-2 ${viewSection === 'LOGS' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
          >
@@ -289,6 +298,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
            Manutenzione
          </button>
       </div>
+
+      {viewSection === 'ROUTINES' && currentUser && (
+        <RoutineManager currentUser={currentUser} />
+      )}
 
       {viewSection === 'LOGS' && (
         <Card className="p-0 overflow-hidden h-[600px]">
@@ -607,10 +620,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                   options={teamOptions}
                 />
               </div>
-
-              <p className="text-xs text-slate-400 italic">
-                Nota: Per gestire assegnazioni multiple ai team e ruoli specifici, utilizza la scheda "Gestione Team".
-              </p>
 
               <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
                 <Button variant="secondary" onClick={() => setEditingUser(null)}>Annulla</Button>
