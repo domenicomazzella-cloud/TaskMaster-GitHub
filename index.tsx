@@ -9,7 +9,7 @@ if (!rootElement) {
 }
 
 // Registrazione Service Worker
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then(registration => {
@@ -18,10 +18,6 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
       .catch(registrationError => {
         console.log('SW registration failed: ', registrationError);
       });
-  });
-} else if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    registrations.forEach(r => r.unregister());
   });
 }
 
