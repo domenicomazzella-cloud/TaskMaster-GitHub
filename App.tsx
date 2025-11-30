@@ -452,9 +452,10 @@ const App: React.FC = () => {
             projects={projects}
             tasks={visibleTasks} // Pass visible tasks so permissions are respected
             currentUser={user}
+            allUsers={allUsers} // Pass allUsers here!
             onCreateTask={handleCreateTask}
             onEditTask={handleEditClick} 
-            onOpenCreateTask={handleOpenCreateTask} // Pass the handler
+            onOpenCreateTask={handleOpenCreateTask} 
           />
         ) : (
           <>

@@ -11,17 +11,17 @@ interface ProjectListProps {
   projects: Project[];
   tasks: Task[];
   currentUser: User;
+  allUsers: User[]; // New prop
   onCreateTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
   onEditTask: (task: Task) => void;
-  onOpenCreateTask: (projectId?: string) => void; // New prop
+  onOpenCreateTask: (projectId?: string) => void; 
 }
 
-export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, currentUser, onCreateTask, onEditTask, onOpenCreateTask }) => {
+export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, currentUser, allUsers, onCreateTask, onEditTask, onOpenCreateTask }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   
-  // Stato per il progetto correntemente aperto in dettaglio
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -60,8 +60,6 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, curre
     }
   };
 
-  // Sort projects: Active first, then Completed, then Archived
-  // Only show top-level projects in the main list (parentProjectId is null)
   const rootProjects = projects.filter(p => !p.parentProjectId).sort((a, b) => {
     const order = { ACTIVE: 0, COMPLETED: 1, ARCHIVED: 2 };
     return (order[a.status] || 0) - (order[b.status] || 0);
@@ -118,13 +116,12 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, curre
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {rootProjects.map(proj => {
-             // Conta sotto-progetti
              const subCount = projects.filter(p => p.parentProjectId === proj.id).length;
              return (
                 <div key={proj.id} className="relative">
                     <ProjectCard 
                     project={proj} 
-                    tasks={tasks} // La card calcolerà i task corretti
+                    tasks={tasks}
                     currentUserRole={currentUser.role}
                     currentUserId={currentUser.id}
                     onDelete={() => handleDelete(proj.id, proj.title)}
@@ -146,15 +143,16 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, tasks, curre
       {selectedProject && (
         <ProjectDetailModal 
            project={selectedProject}
-           allProjects={projects} // Passa tutti per trovare sotto-progetti
+           allProjects={projects}
            tasks={tasks}
            currentUser={currentUser}
+           allUsers={allUsers} // Pass allUsers for lookup
            onClose={() => setSelectedProject(null)}
            onUpdateProject={handleUpdateDetails}
            onCreateTask={onCreateTask}
            onEditTask={onEditTask} 
-           onOpenCreateTask={onOpenCreateTask} // Pass new handler
-           onOpenSubProject={(sub) => setSelectedProject(sub)} // Navigazione
+           onOpenCreateTask={onOpenCreateTask}
+           onOpenSubProject={(sub) => setSelectedProject(sub)}
         />
       )}
     </div>

@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { Project, Task, TaskStatus, TaskPriority } from '../types';
-import { Button, Input, Textarea, Badge } from './UI';
-import { X, CheckCircle2, Circle, ArrowRightCircle, Plus, Save, LayoutGrid, Unlink, Edit, FolderPlus, Folder, Link as LinkIcon, Search, Calendar, Flag, User, Clock } from 'lucide-react';
+import { Project, Task, TaskStatus, TaskPriority, User } from '../types';
+import { Button, Input, Textarea, Badge, Autocomplete } from './UI';
+import { X, CheckCircle2, Circle, ArrowRightCircle, Plus, Save, LayoutGrid, Unlink, Edit, FolderPlus, Folder, Link as LinkIcon, Search, Calendar, Flag, User as UserIcon, Clock, Crown, Shield, Users, Trash2 } from 'lucide-react';
 import { dataService } from '../services/dataService';
 
 interface ProjectDetailModalProps {
@@ -10,6 +10,7 @@ interface ProjectDetailModalProps {
   allProjects: Project[];
   tasks: Task[];
   currentUser: any;
+  allUsers: User[]; // New prop
   onClose: () => void;
   onUpdateProject: (id: string, data: Partial<Project>) => void;
   onCreateTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
@@ -23,6 +24,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   allProjects = [],
   tasks, 
   currentUser,
+  allUsers = [],
   onClose, 
   onUpdateProject, 
   onEditTask,
@@ -39,6 +41,10 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
   const [isAddingSubProject, setIsAddingSubProject] = useState(false);
   const [newSubProjectTitle, setNewSubProjectTitle] = useState('');
+
+  // Team Management State
+  const [isAddingLeader, setIsAddingLeader] = useState(false);
+  const [isAddingShared, setIsAddingShared] = useState(false);
 
   const projectTasks = tasks.filter(t => 
     (t.projectIds && t.projectIds.includes(project.id)) || 
@@ -67,6 +73,12 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   const total = projectTasks.length;
   const completed = projectTasks.filter(t => t.status === TaskStatus.DONE).length;
   const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+  // Mappers
+  const getUsername = (userId: string) => allUsers.find(u => u.id === userId)?.username || 'Utente';
+  const ownerName = getUsername(project.ownerId);
+  const leaders = (project.responsibleIds || []).map(id => ({ id, name: getUsername(id) }));
+  const sharedUsers = (project.sharedWith || []).map(id => ({ id, name: getUsername(id) }));
 
   const handleSaveDetails = () => {
     onUpdateProject(project.id, { title: editTitle, description: editDesc });
@@ -115,6 +127,33 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
     }
   };
 
+  // Team Logic
+  const handleAddLeader = (userId: string) => {
+    if (!project.responsibleIds?.includes(userId)) {
+      const newLeaders = [...(project.responsibleIds || []), userId];
+      onUpdateProject(project.id, { responsibleIds: newLeaders });
+    }
+    setIsAddingLeader(false);
+  };
+
+  const handleRemoveLeader = (userId: string) => {
+    const newLeaders = (project.responsibleIds || []).filter(id => id !== userId);
+    onUpdateProject(project.id, { responsibleIds: newLeaders });
+  };
+
+  const handleAddShared = (userId: string) => {
+    if (!project.sharedWith?.includes(userId)) {
+      const newShared = [...(project.sharedWith || []), userId];
+      onUpdateProject(project.id, { sharedWith: newShared });
+    }
+    setIsAddingShared(false);
+  };
+
+  const handleRemoveShared = (userId: string) => {
+    const newShared = (project.sharedWith || []).filter(id => id !== userId);
+    onUpdateProject(project.id, { sharedWith: newShared });
+  };
+
   const statusIcon = {
     [TaskStatus.TODO]: <Circle className="w-4 h-4 text-slate-400" />,
     [TaskStatus.IN_PROGRESS]: <ArrowRightCircle className="w-4 h-4 text-amber-600" />,
@@ -127,6 +166,8 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
     [TaskPriority.MEDIUM]: 'bg-yellow-100 text-yellow-700 border-yellow-200',
     [TaskPriority.LOW]: 'bg-blue-50 text-blue-700 border-blue-200',
   };
+
+  const canManageTeam = currentUser.id === project.ownerId || currentUser.role === 'ADMIN';
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
@@ -177,8 +218,10 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
           <div className="grid grid-cols-1 lg:grid-cols-4 flex-1 overflow-hidden">
              
-             {/* Left: Info & Stats & Subprojects */}
+             {/* Left: Info & Stats & Team & Subprojects */}
              <div className="p-6 bg-slate-50/50 border-r border-slate-100 lg:col-span-1 space-y-6 overflow-y-auto">
+                
+                {/* Descrizione */}
                 <div>
                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Descrizione</label>
                    {!isEditing ? (
@@ -190,6 +233,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                    )}
                 </div>
 
+                {/* Avanzamento */}
                 <div>
                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Avanzamento</label>
                    <div className="flex items-end gap-2 mb-2">
@@ -208,6 +252,89 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                    </div>
                 </div>
 
+                {/* TEAM SECTION */}
+                <div className="pt-6 border-t border-slate-200">
+                   <label className="text-xs font-bold text-slate-400 uppercase mb-3 block">Team del Progetto</label>
+                   
+                   {/* Proprietario */}
+                   <div className="mb-4">
+                      <span className="text-[10px] text-slate-500 font-semibold mb-1 block">Proprietario</span>
+                      <div className="flex items-center gap-2 text-sm bg-amber-50 border border-amber-200 p-2 rounded-lg text-amber-800">
+                         <Crown className="w-4 h-4 fill-amber-500 text-amber-600" />
+                         <span className="font-bold">{ownerName}</span>
+                      </div>
+                   </div>
+
+                   {/* Leaders */}
+                   <div className="mb-4">
+                      <div className="flex justify-between items-center mb-1">
+                         <span className="text-[10px] text-slate-500 font-semibold">Leaders (Responsabili)</span>
+                         {canManageTeam && !isAddingLeader && (
+                            <button onClick={() => setIsAddingLeader(true)} className="text-indigo-600 hover:bg-indigo-50 p-1 rounded"><Plus className="w-3 h-3"/></button>
+                         )}
+                      </div>
+                      
+                      {isAddingLeader && (
+                         <div className="mb-2">
+                            <Autocomplete 
+                               options={allUsers.map(u => ({ value: u.id, label: u.username }))}
+                               onSelect={handleAddLeader}
+                               placeholder="Cerca leader..."
+                               className="text-sm"
+                            />
+                            <button onClick={() => setIsAddingLeader(false)} className="text-[10px] text-red-500 mt-1 hover:underline">Annulla</button>
+                         </div>
+                      )}
+
+                      <div className="space-y-1">
+                         {leaders.map(l => (
+                            <div key={l.id} className="flex items-center justify-between p-2 bg-white border border-indigo-100 rounded shadow-sm text-sm">
+                               <div className="flex items-center gap-2">
+                                  <Shield className="w-3 h-3 text-indigo-500" />
+                                  <span>{l.name}</span>
+                               </div>
+                               {canManageTeam && (
+                                  <button onClick={() => handleRemoveLeader(l.id)} className="text-slate-300 hover:text-red-500"><X className="w-3 h-3"/></button>
+                               )}
+                            </div>
+                         ))}
+                         {leaders.length === 0 && !isAddingLeader && <span className="text-xs text-slate-400 italic">Nessun leader aggiuntivo.</span>}
+                      </div>
+                   </div>
+
+                   {/* Condivisi */}
+                   <div className="mb-2">
+                      <div className="flex justify-between items-center mb-1">
+                         <span className="text-[10px] text-slate-500 font-semibold">Condiviso con</span>
+                         {canManageTeam && !isAddingShared && (
+                            <button onClick={() => setIsAddingShared(true)} className="text-indigo-600 hover:bg-indigo-50 p-1 rounded"><Plus className="w-3 h-3"/></button>
+                         )}
+                      </div>
+
+                      {isAddingShared && (
+                         <div className="mb-2">
+                            <Autocomplete 
+                               options={allUsers.filter(u => u.id !== project.ownerId && !(project.responsibleIds || []).includes(u.id)).map(u => ({ value: u.id, label: u.username }))}
+                               onSelect={handleAddShared}
+                               placeholder="Cerca utente..."
+                               className="text-sm"
+                            />
+                            <button onClick={() => setIsAddingShared(false)} className="text-[10px] text-red-500 mt-1 hover:underline">Annulla</button>
+                         </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-1">
+                         {sharedUsers.map(u => (
+                            <Badge key={u.id} color="slate" className="pl-1 pr-1" onRemove={canManageTeam ? () => handleRemoveShared(u.id) : undefined}>
+                               <Users className="w-3 h-3 mr-1 text-slate-400" /> {u.name}
+                            </Badge>
+                         ))}
+                         {sharedUsers.length === 0 && !isAddingShared && <span className="text-xs text-slate-400 italic">Progetto privato.</span>}
+                      </div>
+                   </div>
+                </div>
+
+                {/* SOTTO-PROGETTI */}
                 <div className="pt-6 border-t border-slate-200">
                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Sotto-Progetti</label>
                    <div className="space-y-2 mb-3">
