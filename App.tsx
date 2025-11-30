@@ -15,6 +15,7 @@ import { dataService } from './services/dataService';
 import { notificationService } from './services/notificationService';
 import { isFirebaseConfigured } from './firebase';
 import { Plus, Search, Filter, X, Layout, List, LogOut, ShieldCheck, CheckSquare, Tag, Calendar as CalendarIcon, Bell, BellOff, History, KeyRound, Users, Share2, LayoutGrid } from 'lucide-react';
+import { NotificationCenter } from './components/NotificationCenter';
 
 const App: React.FC = () => {
   // --- Auth State ---
@@ -398,6 +399,7 @@ const App: React.FC = () => {
                 <History className="w-5 h-5" />
               </Button>
 
+              <NotificationCenter currentUser={user} />
 
               <div className="hidden md:flex items-center text-sm text-slate-600 border-l border-slate-200 pl-4 ml-2">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold mr-2 ${user.role === UserRole.ADMIN ? 'bg-indigo-600' : user.role === UserRole.MANAGER ? 'bg-green-600' : 'bg-slate-400'}`}>
