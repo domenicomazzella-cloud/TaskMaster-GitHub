@@ -34,6 +34,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
   const [attachments, setAttachments] = useState<Attachment[]>(initialTask?.attachments || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Gestione Multi-Progetto
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(
     initialTask?.projectIds || 
     (initialTask?.projectId ? [initialTask.projectId] : []) || 
@@ -143,13 +144,15 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     setAttachments(prev => prev.filter(a => a.id !== id));
   };
 
-  const handleProjectToggle = (projectId: string) => {
-    if (projectId === '') return;
-    if (selectedProjectIds.includes(projectId)) {
-        setSelectedProjectIds(prev => prev.filter(id => id !== projectId));
-    } else {
+  // Logica per aggiungere/rimuovere progetti dalla lista
+  const handleAddProject = (projectId: string) => {
+    if (projectId && !selectedProjectIds.includes(projectId)) {
         setSelectedProjectIds(prev => [...prev, projectId]);
     }
+  };
+
+  const handleRemoveProject = (projectId: string) => {
+    setSelectedProjectIds(prev => prev.filter(id => id !== projectId));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -169,7 +172,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
       ownerId: initialTask ? initialTask.ownerId : currentUser.id,
       sharedWith: sharedWithIds,
       projectIds: selectedProjectIds,
-      projectId: undefined
+      projectId: undefined // Ensure legacy field is cleared
     };
 
     try {
@@ -183,7 +186,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
       }
     } catch (e) {
       console.error(e);
-      setIsSubmitting(false); // Re-enable if error
+      setIsSubmitting(false);
     }
   };
 
@@ -221,16 +224,18 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         />
         
         {/* Multi-Project Selector */}
-        <div>
+        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
             <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                <Briefcase className="w-4 h-4" /> Progetti (Task Madre)
+                <Briefcase className="w-4 h-4" /> Progetti collegati
             </label>
-            <div className="flex flex-wrap gap-2 mb-2">
+            
+            <div className="flex flex-wrap gap-2 mb-3">
+                {selectedProjectIds.length === 0 && <span className="text-xs text-slate-400 italic">Nessun progetto collegato</span>}
                 {selectedProjectIds.map(pid => {
                     const proj = projects.find(p => p.id === pid);
                     return (
-                        <Badge key={pid} color="indigo" onRemove={() => handleProjectToggle(pid)}>
-                            {proj?.title || 'Progetto Sconosciuto'}
+                        <Badge key={pid} color="indigo" onRemove={() => handleRemoveProject(pid)}>
+                            {proj?.title || 'Progetto non trovato'}
                         </Badge>
                     );
                 })}
@@ -240,14 +245,15 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm"
                 onChange={(e) => {
                     if (e.target.value) {
-                        handleProjectToggle(e.target.value);
-                        e.target.value = '';
+                        handleAddProject(e.target.value);
+                        e.target.value = ''; // Reset select
                     }
                 }}
+                value=""
             >
-                <option value="">Aggiungi a un progetto...</option>
+                <option value="" disabled>+ Aggiungi a un progetto...</option>
                 {projects
-                    .filter(p => !selectedProjectIds.includes(p.id))
+                    .filter(p => !selectedProjectIds.includes(p.id)) // Mostra solo progetti non ancora selezionati
                     .map(p => (
                     <option key={p.id} value={p.id}>
                         {p.title}

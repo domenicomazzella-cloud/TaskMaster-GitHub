@@ -189,10 +189,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, currentUserId, current
       {projectNames && projectNames.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1">
           {projectNames.map((name, idx) => (
-            <span key={idx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100/50">
-              <LayoutGrid className="w-3 h-3" />
-              {name}
-            </span>
+            <Badge key={idx} color="indigo" className="text-[10px] uppercase tracking-wider pl-1.5">
+               <LayoutGrid className="w-3 h-3 mr-1" /> {name}
+            </Badge>
           ))}
         </div>
       )}
