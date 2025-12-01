@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { TagSuggestionRequest } from "../types";
 
-const apiKey = process.env.API_KEY || '';
+const apiKey = (import.meta as any).env?.VITE_API_KEY || '';
 
 // Initialize client lazily inside the function to avoid immediate errors if key is missing
 export const suggestTagsWithGemini = async (request: TagSuggestionRequest): Promise<string[]> => {
