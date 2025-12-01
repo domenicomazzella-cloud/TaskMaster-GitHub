@@ -7,7 +7,7 @@ import { getStorage } from 'firebase/storage';
 // Inserisci qui le tue chiavi Firebase reali
 // Se usi Vite/CreateReactApp, puoi usare le variabili d'ambiente (crea un file .env)
 // Altrimenti sostituisci le stringhe che iniziano con "TUO_" o "INSERISCI_"
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyDoRvLYNrc-B4B4LVhpyL_qM7khVd3lxQd",
   authDomain: "task-acdl.firebaseapp.com",
   projectId: "task-acdl",
