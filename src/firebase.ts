@@ -7,7 +7,7 @@ import { getStorage } from 'firebase/storage';
 // Inserisci qui le tue chiavi Firebase reali
 // Se usi Vite/CreateReactApp, puoi usare le variabili d'ambiente (crea un file .env)
 // Altrimenti sostituisci le stringhe che iniziano con "TUO_" o "INSERISCI_"
-export const firebaseConfig = {
+const defaultConfig = {
   apiKey: "AIzaSyDoRvLYNrc-B4B4LVhpyL_qM7khVd3lxQd",
   authDomain: "task-acdl.firebaseapp.com",
   projectId: "task-acdl",
@@ -16,6 +16,34 @@ export const firebaseConfig = {
   appId: "1:1070342625896:web:30de092e120659d192b9dd",
   measurementId: "G-M5I2021DP3"
 };
+
+const envConfig = {
+  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || '',
+  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || '',
+  measurementId: (import.meta as any).env?.VITE_FIREBASE_MEASUREMENT_ID || ''
+};
+
+let runtimeConfig = { ...defaultConfig };
+for (const k of Object.keys(envConfig) as (keyof typeof envConfig)[]) {
+  const v = envConfig[k];
+  if (v) (runtimeConfig as any)[k] = v;
+}
+
+try {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('firebase_config');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      runtimeConfig = { ...runtimeConfig, ...parsed };
+    }
+  }
+} catch {}
+
+export const firebaseConfig = runtimeConfig;
 
 
 // Controllo robusto per vedere se le chiavi sono state inserite
