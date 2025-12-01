@@ -347,7 +347,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
       
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
+      <header className="bg-white/80 backdrop-blur border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-2">
@@ -357,36 +357,36 @@ const App: React.FC = () => {
               <h1 className="text-xl font-bold tracking-tight text-slate-800 hidden sm:block">TaskMaster AI</h1>
             </div>
             
-            <div className="flex space-x-2 bg-slate-100 p-1 rounded-lg">
+            <div className="flex flex-wrap gap-2 bg-slate-100 p-1 rounded-lg">
+              <button
+                onClick={() => setActiveTab('TASKS')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${
+                  activeTab === 'TASKS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                <CheckSquare className="w-4 h-4" />
+                Task
+              </button>
+              <button
+                onClick={() => setActiveTab('PROJECTS')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${
+                  activeTab === 'PROJECTS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+                Progetti
+              </button>
+              {user.role === UserRole.ADMIN && (
                 <button
-                  onClick={() => setActiveTab('TASKS')}
+                  onClick={() => setActiveTab('ADMIN')}
                   className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${
-                    activeTab === 'TASKS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'
+                    activeTab === 'ADMIN' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'
                   }`}
                 >
-                  <CheckSquare className="w-4 h-4" />
-                  Task
+                  <ShieldCheck className="w-4 h-4" />
+                  Admin
                 </button>
-                <button
-                  onClick={() => setActiveTab('PROJECTS')}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${
-                    activeTab === 'PROJECTS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'
-                  }`}
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                  Progetti
-                </button>
-                {user.role === UserRole.ADMIN && (
-                  <button
-                    onClick={() => setActiveTab('ADMIN')}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${
-                      activeTab === 'ADMIN' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'
-                    }`}
-                  >
-                    <ShieldCheck className="w-4 h-4" />
-                    Admin
-                  </button>
-                )}
+              )}
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">
