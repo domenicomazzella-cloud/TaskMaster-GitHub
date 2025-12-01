@@ -224,6 +224,9 @@ export const Auth: React.FC<AuthProps> = () => {
       if (err.code === 'auth/network-request-failed') msg = "Errore di connessione. Controlla internet.";
       if (err.code === 'permission-denied') msg = "Permesso negato al Database.";
       setError(msg);
+      if (msg.includes('API Key')) {
+        setShowConfigForm(true);
+      }
     } finally {
       setIsLoading(false);
     }
