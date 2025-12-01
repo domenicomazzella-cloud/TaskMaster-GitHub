@@ -43,6 +43,12 @@ try {
   }
 } catch {}
 
+// Normalize storage bucket domain if pasted from wrong source
+if (runtimeConfig.storageBucket && runtimeConfig.storageBucket.endsWith('firebasestorage.app')) {
+  const projectId = runtimeConfig.projectId || defaultConfig.projectId;
+  runtimeConfig.storageBucket = `${projectId}.appspot.com`;
+}
+
 export const firebaseConfig = runtimeConfig;
 
 
