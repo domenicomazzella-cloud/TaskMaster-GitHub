@@ -220,7 +220,7 @@ export const Auth: React.FC<AuthProps> = () => {
       if (err.code === 'auth/invalid-credential') msg = "Email o password non validi.";
       if (err.code === 'auth/email-already-in-use') msg = "Email già registrata.";
       if (err.code === 'auth/weak-password') msg = "La password deve essere di almeno 6 caratteri.";
-      if (err.code === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.') msg = "API Key non valida.";
+      if (err.code === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.' || err.code === 'auth/invalid-api-key') msg = "API Key non valida.";
       if (err.code === 'auth/network-request-failed') msg = "Errore di connessione. Controlla internet.";
       if (err.code === 'permission-denied') msg = "Permesso negato al Database.";
       setError(msg);
